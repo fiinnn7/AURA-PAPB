@@ -15,6 +15,7 @@ internal fun SettingsScreen(
     onUbahSandi: () -> Unit,
     onAkunKasir: () -> Unit,
     onMetodePembayaran: () -> Unit,
+    onPengaturanToko: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Page(modifier = modifier) {
@@ -34,6 +35,11 @@ internal fun SettingsScreen(
             detail = stringResource(R.string.screen_copy_147),
             onClick = onMetodePembayaran,
         )
+        ActionRow(
+            title = stringResource(R.string.shop_settings_title),
+            detail = stringResource(R.string.shop_settings_subtitle),
+            onClick = onPengaturanToko,
+        )
     }
 }
 
@@ -41,6 +47,6 @@ internal fun SettingsScreen(
 @Composable
 private fun SettingsScreenPreview() {
     AuraTheme {
-        SettingsScreen(onUbahSandi = {}, onAkunKasir = {}, onMetodePembayaran = {})
+        SettingsScreen(onUbahSandi = {}, onAkunKasir = {}, onMetodePembayaran = {}, onPengaturanToko = {})
     }
 }

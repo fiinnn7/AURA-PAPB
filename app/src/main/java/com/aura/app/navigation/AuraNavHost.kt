@@ -1,5 +1,8 @@
 package com.aura.app.navigation
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -28,12 +31,14 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -56,6 +61,9 @@ import com.aura.app.data.network.KoneksiChecker
 import com.aura.app.data.remote.GlobalSessionHandler
 import com.aura.app.data.repository.AkunRepository
 import com.aura.app.data.repository.AuthRepository
+import com.aura.app.data.repository.BarangRepository
+import com.aura.app.data.repository.KeuanganRepository
+import com.aura.app.data.repository.PenjualanRepository
 import com.aura.app.ui.AuraViewModel
 import com.aura.app.ui.auth.AuthSessionEvent
 import com.aura.app.ui.auth.AuthSessionViewModel
@@ -65,9 +73,15 @@ import com.aura.app.ui.auth.RegisterEvent
 import com.aura.app.ui.auth.RegisterViewModel
 import com.aura.app.ui.auth.UbahKataSandiEvent
 import com.aura.app.ui.auth.UbahKataSandiViewModel
+import com.aura.app.ui.barang.KatalogEvent
+import com.aura.app.ui.barang.KatalogViewModel
 import com.aura.app.ui.components.AvatarSheet
 import com.aura.app.ui.components.GantiAkunSheet
 import com.aura.app.ui.components.LogoutConfirmationDialog
+import com.aura.app.ui.kasir.KasirEvent
+import com.aura.app.ui.kasir.KasirViewModel
+import com.aura.app.ui.keuangan.KeuanganEvent
+import com.aura.app.ui.keuangan.KeuanganViewModel
 import com.aura.app.ui.profile.EditProfilEvent
 import com.aura.app.ui.profile.ManajemenKasirViewModel
 import com.aura.app.ui.profile.ProfilViewModel
@@ -78,11 +92,13 @@ import com.aura.app.ui.screens.auth.RegisterTwoScreen
 import com.aura.app.ui.screens.auth.UbahKataSandiScreen
 import com.aura.app.ui.screens.auth.WelcomeScreen
 import com.aura.app.ui.screens.barang.AdjustmentScreen
+import com.aura.app.ui.screens.barang.CategoryManagementScreen
 import com.aura.app.ui.screens.barang.MovementScreen
 import com.aura.app.ui.screens.barang.ProductDetailScreen
 import com.aura.app.ui.screens.barang.ProductFormScreen
 import com.aura.app.ui.screens.barang.ProductListScreen
 import com.aura.app.ui.screens.barang.RestockScreen
+import com.aura.app.ui.screens.barang.SupplierDetailScreen
 import com.aura.app.ui.screens.barang.SupplierScreen
 import com.aura.app.ui.screens.dashboard.DashboardScreen
 import com.aura.app.ui.screens.kasir.CartScreen
@@ -90,8 +106,10 @@ import com.aura.app.ui.screens.kasir.CashierScreen
 import com.aura.app.ui.screens.kasir.HistoryScreen
 import com.aura.app.ui.screens.kasir.PaymentScreen
 import com.aura.app.ui.screens.kasir.SuccessScreen
+import com.aura.app.ui.screens.keuangan.ExpenseDetailScreen
 import com.aura.app.ui.screens.keuangan.ExpenseFormScreen
 import com.aura.app.ui.screens.keuangan.ExpenseListScreen
+import com.aura.app.ui.screens.keuangan.IncomeDetailScreen
 import com.aura.app.ui.screens.keuangan.IncomeFormScreen
 import com.aura.app.ui.screens.keuangan.IncomeListScreen
 import com.aura.app.ui.screens.manajemen.ManagementScreen
@@ -100,6 +118,7 @@ import com.aura.app.ui.screens.profile.ActivityScreen
 import com.aura.app.ui.screens.profile.CashierAccountsScreen
 import com.aura.app.ui.screens.profile.EditProfilScreen
 import com.aura.app.ui.screens.profile.PaymentSettingsScreen
+import com.aura.app.ui.screens.profile.PengaturanTokoScreen
 import com.aura.app.ui.screens.profile.ProfileScreen
 import com.aura.app.ui.screens.profile.SettingsScreen
 import com.aura.app.ui.theme.Bg
@@ -110,10 +129,12 @@ import kotlinx.coroutines.launch
 
 private val ownerRoutes = setOf(
     Routes.DASHBOARD, Routes.MENU_MANAJEMEN, Routes.ANALISIS, Routes.PROFIL, Routes.NOTIFIKASI,
-    Routes.PENGELUARAN, Routes.CATAT_PENGELUARAN, Routes.PEMASUKAN, Routes.CATAT_PEMASUKAN,
+    Routes.PENGELUARAN, Routes.DETAIL_PENGELUARAN, Routes.CATAT_PENGELUARAN,
+    Routes.PEMASUKAN, Routes.DETAIL_PEMASUKAN, Routes.CATAT_PEMASUKAN,
     Routes.MANAJEMEN_BARANG, Routes.PROFIL_BARANG, Routes.TAMBAH_BARANG, Routes.CATAT_RESTOCK,
-    Routes.PENYESUAIAN_STOK, Routes.PERGERAKAN_STOK, Routes.SUPPLIER, Routes.RIWAYAT_AKTIVITAS,
-    Routes.PENGATURAN, Routes.MANAJEMEN_AKUN_KASIR, Routes.METODE_PEMBAYARAN,
+    Routes.PENYESUAIAN_STOK, Routes.PERGERAKAN_STOK, Routes.SUPPLIER, Routes.PROFIL_SUPPLIER,
+    Routes.KELOLA_KATEGORI, Routes.RIWAYAT_AKTIVITAS,
+    Routes.PENGATURAN, Routes.MANAJEMEN_AKUN_KASIR, Routes.METODE_PEMBAYARAN, Routes.PENGATURAN_TOKO,
     Routes.K4_TRANSAKSI_BERHASIL_OWNER, Routes.RIWAYAT_HARI_INI_OWNER,
 )
 
@@ -152,11 +173,15 @@ private fun RouteNavHost(
             composable(Routes.PENYESUAIAN_STOK) { content(Routes.PENYESUAIAN_STOK, it) }
             composable(Routes.PERGERAKAN_STOK) { content(Routes.PERGERAKAN_STOK, it) }
             composable(Routes.SUPPLIER) { content(Routes.SUPPLIER, it) }
+            composable(Routes.PROFIL_SUPPLIER) { content(Routes.PROFIL_SUPPLIER, it) }
+            composable(Routes.KELOLA_KATEGORI) { content(Routes.KELOLA_KATEGORI, it) }
         }
         navigation(startDestination = Routes.PENGELUARAN, route = "keuangan_tab_graph") {
             composable(Routes.PENGELUARAN) { content(Routes.PENGELUARAN, it) }
+            composable(Routes.DETAIL_PENGELUARAN) { content(Routes.DETAIL_PENGELUARAN, it) }
             composable(Routes.CATAT_PENGELUARAN) { content(Routes.CATAT_PENGELUARAN, it) }
             composable(Routes.PEMASUKAN) { content(Routes.PEMASUKAN, it) }
+            composable(Routes.DETAIL_PEMASUKAN) { content(Routes.DETAIL_PEMASUKAN, it) }
             composable(Routes.CATAT_PEMASUKAN) { content(Routes.CATAT_PEMASUKAN, it) }
         }
         navigation(startDestination = Routes.K1_BERANDA_KASIR, route = "kasir_tab_graph") {
@@ -174,6 +199,7 @@ private fun RouteNavHost(
             composable(Routes.PENGATURAN) { content(Routes.PENGATURAN, it) }
             composable(Routes.MANAJEMEN_AKUN_KASIR) { content(Routes.MANAJEMEN_AKUN_KASIR, it) }
             composable(Routes.METODE_PEMBAYARAN) { content(Routes.METODE_PEMBAYARAN, it) }
+            composable(Routes.PENGATURAN_TOKO) { content(Routes.PENGATURAN_TOKO, it) }
             composable(Routes.EDIT_PROFIL) { content(Routes.EDIT_PROFIL, it) }
             composable(Routes.UBAH_KATA_SANDI) { content(Routes.UBAH_KATA_SANDI, it) }
         }
@@ -185,10 +211,14 @@ private fun RouteNavHost(
 fun AuraNavHost(
     authRepository: AuthRepository,
     akunRepository: AkunRepository,
+    barangRepository: BarangRepository,
+    penjualanRepository: PenjualanRepository,
+    keuanganRepository: KeuanganRepository,
     globalSessionHandler: GlobalSessionHandler,
     koneksiChecker: KoneksiChecker,
     vm: AuraViewModel = viewModel(),
 ) {
+    val context = LocalContext.current
     val resources = LocalResources.current
     val authSessionVm: AuthSessionViewModel = viewModel(
         factory = AuthSessionViewModel.factory(authRepository, globalSessionHandler, koneksiChecker),
@@ -197,8 +227,15 @@ fun AuraNavHost(
     val riwayatAkun by authSessionVm.riwayatAkun.collectAsStateWithLifecycle()
     val startupChecked by authSessionVm.startupChecked.collectAsStateWithLifecycle()
     val gantiAkunState by authSessionVm.gantiAkunState.collectAsStateWithLifecycle()
+    val kasirVm: KasirViewModel = viewModel(
+        factory = KasirViewModel.factory(penjualanRepository, barangRepository),
+    )
+    val kasirState by kasirVm.uiState.collectAsStateWithLifecycle()
+    val keuanganVm: KeuanganViewModel = viewModel(
+        factory = KeuanganViewModel.factory(keuanganRepository, barangRepository),
+    )
+    val keuanganState by keuanganVm.uiState.collectAsStateWithLifecycle()
 
-    val store by vm.store.collectAsStateWithLifecycle()
     val products by vm.products.collectAsStateWithLifecycle()
     val suppliers by vm.suppliers.collectAsStateWithLifecycle()
     val transactions by vm.transactions.collectAsStateWithLifecycle()
@@ -209,9 +246,6 @@ fun AuraNavHost(
     val movements by vm.movements.collectAsStateWithLifecycle()
     val activities by vm.activities.collectAsStateWithLifecycle()
     val notifications by vm.notifications.collectAsStateWithLifecycle()
-    val cart by vm.cart.collectAsStateWithLifecycle()
-    val invoice by vm.lastInvoice.collectAsStateWithLifecycle()
-    val lastTotal by vm.lastTotal.collectAsStateWithLifecycle()
     val message by vm.message.collectAsStateWithLifecycle()
     val busy by vm.busy.collectAsStateWithLifecycle()
     val ready by vm.ready.collectAsStateWithLifecycle()
@@ -224,13 +258,15 @@ fun AuraNavHost(
 
     var selectedProductId by rememberSaveable { mutableStateOf("BRG-001") }
     var editProductId by rememberSaveable { mutableStateOf<String?>(null) }
-    var selectedTransaction by rememberSaveable { mutableStateOf("") }
+    var selectedSupplierId by rememberSaveable { mutableStateOf("") }
     var showAvatar by remember { mutableStateOf(false) }
     var showGantiAkun by remember { mutableStateOf(false) }
     var showLogoutConfirm by remember { mutableStateOf(false) }
-    var cancelInvoice by remember { mutableStateOf<String?>(null) }
+    var cancelTransaksiId by remember { mutableStateOf<String?>(null) }
     var isOwnerCancel by remember { mutableStateOf(true) }
     var cancelReason by rememberSaveable { mutableStateOf("") }
+    var selectedExpenseId by rememberSaveable { mutableStateOf("") }
+    var selectedIncomeId by rememberSaveable { mutableStateOf("") }
     var hideBalance by rememberSaveable { mutableStateOf(true) }
     var analysisTab by rememberSaveable { mutableStateOf("Ringkasan") }
     var search by rememberSaveable { mutableStateOf("") }
@@ -261,6 +297,8 @@ fun AuraNavHost(
         }
     }
 
+    val navigateToRoute by rememberUpdatedState<(String) -> Unit> { target -> go(target) }
+
     fun back() {
         if (route == Routes.UBAH_KATA_SANDI_WAJIB) {
             return
@@ -282,6 +320,70 @@ fun AuraNavHost(
             wajibGantiSandi -> root(Routes.UBAH_KATA_SANDI_WAJIB)
             peran == Peran.OWNER -> root(Routes.DASHBOARD)
             else -> root(Routes.K1_BERANDA_KASIR)
+        }
+    }
+
+    LaunchedEffect(sesiAktif?.akunId, sesiAktif?.idToko) {
+        kasirVm.sambungkanSesi(sesiAktif)
+        keuanganVm.sambungkanSesi(sesiAktif)
+    }
+
+    LaunchedEffect(route, sesiAktif?.idToko) {
+        when (route) {
+            Routes.K3_PEMBAYARAN -> kasirVm.muatMetodePembayaran()
+            Routes.RIWAYAT_HARI_INI, Routes.RIWAYAT_HARI_INI_OWNER -> kasirVm.muatRiwayatHariIni()
+        }
+    }
+
+    LaunchedEffect(kasirVm) {
+        kasirVm.events.collect { event ->
+            when (event) {
+                is KasirEvent.TampilkanPesan -> showSnackbar(
+                    event.pesan.detail ?: resources.getString(event.pesan.fallback),
+                )
+                is KasirEvent.TransaksiBerhasil -> navigateToRoute(
+                    if (event.olehOwner) {
+                        Routes.K4_TRANSAKSI_BERHASIL_OWNER
+                    } else {
+                        Routes.K4_TRANSAKSI_BERHASIL
+                    },
+                )
+                is KasirEvent.PembatalanBerhasil -> {
+                    cancelTransaksiId = null
+                    cancelReason = ""
+                    showSnackbar(
+                        resources.getString(
+                            if (event.olehOwner) {
+                                R.string.kasir_transaction_cancelled
+                            } else {
+                                R.string.kasir_cancel_request_sent
+                            },
+                        ),
+                    )
+                }
+            }
+        }
+    }
+
+    LaunchedEffect(keuanganVm) {
+        keuanganVm.events.collect { event ->
+            when (event) {
+                KeuanganEvent.FormTersimpan -> back()
+                KeuanganEvent.PembatalanBerhasil -> back()
+                is KeuanganEvent.TampilkanPesan -> showSnackbar(event.teks)
+            }
+        }
+    }
+
+    LaunchedEffect(route, sesiAktif?.idToko) {
+        if (route in setOf(
+                Routes.PENGELUARAN,
+                Routes.PEMASUKAN,
+                Routes.METODE_PEMBAYARAN,
+                Routes.PENGATURAN_TOKO,
+            )
+        ) {
+            keuanganVm.refresh()
         }
     }
 
@@ -534,115 +636,512 @@ fun AuraNavHost(
                         onUbahSandi = { go(Routes.UBAH_KATA_SANDI) },
                         onAkunKasir = { go(Routes.MANAJEMEN_AKUN_KASIR) },
                         onMetodePembayaran = { go(Routes.METODE_PEMBAYARAN) },
+                        onPengaturanToko = { go(Routes.PENGATURAN_TOKO) },
                     )
 
                     Routes.MANAJEMEN_AKUN_KASIR -> {
-                        val kasirVm: ManajemenKasirViewModel = viewModel(
+                        val kasirAkunVm: ManajemenKasirViewModel = viewModel(
                             backStackEntry,
                             factory = ManajemenKasirViewModel.factory(akunRepository, koneksiChecker),
                         )
-                        val kasirState by kasirVm.uiState.collectAsStateWithLifecycle()
+                        val kasirAkunState by kasirAkunVm.uiState.collectAsStateWithLifecycle()
                         LaunchedEffect(sesiAktif?.idToko) {
-                            sesiAktif?.idToko?.let { kasirVm.muat(it) }
+                            sesiAktif?.idToko?.let { kasirAkunVm.muat(it) }
                         }
                         CashierAccountsScreen(
-                            uiState = kasirState,
-                            onBuatSandiOtomatis = kasirVm::buatSandiOtomatis,
-                            onTambahKasir = kasirVm::tambahKasir,
-                            onUbahStatus = kasirVm::ubahStatus,
-                            onResetSandi = kasirVm::resetKataSandi,
-                            onHapusKasir = kasirVm::hapusKasir,
-                            onRefresh = kasirVm::refresh,
-                            onTutupInfoLogin = kasirVm::tutupDialogInfoLogin,
+                            uiState = kasirAkunState,
+                            onBuatSandiOtomatis = kasirAkunVm::buatSandiOtomatis,
+                            onTambahKasir = kasirAkunVm::tambahKasir,
+                            onUbahStatus = kasirAkunVm::ubahStatus,
+                            onResetSandi = kasirAkunVm::resetKataSandi,
+                            onHapusKasir = kasirAkunVm::hapusKasir,
+                            onRefresh = kasirAkunVm::refresh,
+                            onTutupInfoLogin = kasirAkunVm::tutupDialogInfoLogin,
                             onPesan = { showSnackbar(it) },
                         )
                     }
 
-                    Routes.DASHBOARD -> DashboardScreen(store, products, transactions, cashRecords, hideBalance, { hideBalance = !hideBalance }, { go(it) })
+                    Routes.DASHBOARD -> DashboardScreen(keuanganState.toko, products, transactions, cashRecords, hideBalance, { hideBalance = !hideBalance }, { go(it) })
                     Routes.MENU_MANAJEMEN -> ManagementScreen(go = { go(it) })
                     Routes.ANALISIS -> AnalysisScreen(analysisTab, { analysisTab = it }, products, transactions, transactionItems, cashRecords, adjustments, restocks, movements)
                     Routes.NOTIFIKASI -> NotificationScreen(notifications, { vm.readNotification(it) }, { vm.readAllNotifications() }, { go(it) })
                     Routes.PENGELUARAN -> ExpenseListScreen(
-                        records = cashRecords.filter { it.kind == "expense" },
-                        restocks = restocks,
-                        products = products,
-                        add = { go(Routes.CATAT_PENGELUARAN) },
+                        uiState = keuanganState,
+                        onAdd = { go(Routes.CATAT_PENGELUARAN) },
+                        onDetail = {
+                            selectedExpenseId = it
+                            go(Routes.DETAIL_PENGELUARAN)
+                        },
+                        onRefresh = keuanganVm::refresh,
                     )
-                    Routes.CATAT_PENGELUARAN -> ExpenseFormScreen(
-                        save = { category, amount, note, prive -> vm.expense(category, amount, note, prive); back() },
-                        back = { back() },
-                    )
+                    Routes.DETAIL_PENGELUARAN -> {
+                        LaunchedEffect(selectedExpenseId) {
+                            if (selectedExpenseId.isNotBlank()) keuanganVm.muatDetailPengeluaran(selectedExpenseId)
+                        }
+                        ExpenseDetailScreen(
+                            uiState = keuanganState,
+                            onCancel = keuanganVm::batalkanPengeluaran,
+                            onLoadFile = keuanganVm::muatFile,
+                        )
+                    }
+                    Routes.CATAT_PENGELUARAN -> {
+                        LaunchedEffect(backStackEntry) { keuanganVm.siapkanFormPengeluaran() }
+                        ExpenseFormScreen(
+                            uiState = keuanganState,
+                            onTitleChange = keuanganVm::ubahJudulPengeluaran,
+                            onTypeChange = keuanganVm::ubahJenisBiaya,
+                            onAmountChange = keuanganVm::ubahNominalPengeluaran,
+                            onNoteChange = keuanganVm::ubahCatatanPengeluaran,
+                            onUploadEvidence = keuanganVm::unggahBukti,
+                            onRemoveEvidence = keuanganVm::resetBuktiUnggahan,
+                            onSave = keuanganVm::catatPengeluaran,
+                            onBack = { back() },
+                        )
+                    }
                     Routes.PEMASUKAN -> IncomeListScreen(
-                        transactions = transactions,
-                        records = cashRecords.filter { it.kind == "income" },
-                        add = { go(Routes.CATAT_PEMASUKAN) },
+                        uiState = keuanganState,
+                        onAdd = { go(Routes.CATAT_PEMASUKAN) },
+                        onDetail = { id, _ ->
+                            selectedIncomeId = id
+                            go(Routes.DETAIL_PEMASUKAN)
+                        },
+                        onRefresh = keuanganVm::refresh,
                     )
-                    Routes.CATAT_PEMASUKAN -> IncomeFormScreen(
-                        save = { category, amount, note, capital -> vm.income(category, amount, note, capital); back() },
-                        back = { back() },
-                    )
-                    Routes.MANAJEMEN_BARANG -> ProductListScreen(
-                        items = products,
-                        search = search,
-                        setSearch = { search = it },
-                        detail = { selectedProductId = it; go(Routes.PROFIL_BARANG) },
-                        add = { editProductId = null; go(Routes.TAMBAH_BARANG) },
-                        restock = { go(Routes.CATAT_RESTOCK) },
-                    )
-                    Routes.PROFIL_BARANG -> ProductDetailScreen(products.firstOrNull { it.id == selectedProductId }, { go(Routes.CATAT_RESTOCK) }, { editProductId = selectedProductId; go(Routes.TAMBAH_BARANG) }, { go(Routes.PENYESUAIAN_STOK) }, { go(Routes.PERGERAKAN_STOK) }, { vm.archiveProduct(selectedProductId); back() })
-                    Routes.TAMBAH_BARANG -> ProductFormScreen(products.firstOrNull { it.id == editProductId }, { sku, name, categories, unit, sell, hpp, stock, min -> vm.saveProduct(editProductId, sku, name, categories, unit, sell, hpp, stock, min); back() }, { back() })
-                    Routes.CATAT_RESTOCK -> RestockScreen(products, suppliers, { pid, qty, price, sid, note -> vm.restock(pid, qty, price, sid, note); back() }, { back() })
-                    Routes.PENYESUAIAN_STOK -> AdjustmentScreen(products, { pid, stock, reason, note -> vm.adjustStock(pid, stock, reason, note); back() }, { back() })
-                    Routes.PERGERAKAN_STOK -> MovementScreen(movements)
-                    Routes.SUPPLIER -> SupplierScreen(suppliers, { id, name, phone, address, note -> vm.saveSupplier(id, name, phone, address, note) }, { vm.deleteSupplier(it) })
+                    Routes.DETAIL_PEMASUKAN -> {
+                        LaunchedEffect(selectedIncomeId) {
+                            if (selectedIncomeId.isNotBlank()) keuanganVm.muatDetailPemasukan(selectedIncomeId)
+                        }
+                        IncomeDetailScreen(
+                            uiState = keuanganState,
+                            onCancel = keuanganVm::batalkanPemasukan,
+                            onLoadFile = keuanganVm::muatFile,
+                        )
+                    }
+                    Routes.CATAT_PEMASUKAN -> {
+                        LaunchedEffect(backStackEntry) { keuanganVm.siapkanFormPemasukan() }
+                        IncomeFormScreen(
+                            uiState = keuanganState,
+                            onTitleChange = keuanganVm::ubahJudulPemasukan,
+                            onAmountChange = keuanganVm::ubahNominalPemasukan,
+                            onNoteChange = keuanganVm::ubahCatatanPemasukan,
+                            onUploadEvidence = keuanganVm::unggahBukti,
+                            onRemoveEvidence = keuanganVm::resetBuktiUnggahan,
+                            onSave = keuanganVm::catatPemasukan,
+                            onBack = { back() },
+                        )
+                    }
+                    Routes.MANAJEMEN_BARANG -> {
+                        val katalogVm: KatalogViewModel = viewModel(
+                            backStackEntry,
+                            factory = KatalogViewModel.factory(barangRepository),
+                        )
+                        val katalogState by katalogVm.uiState.collectAsStateWithLifecycle()
+                        LaunchedEffect(sesiAktif?.idToko) {
+                            sesiAktif?.idToko?.let(katalogVm::muat)
+                        }
+                        LaunchedEffect(katalogVm) {
+                            katalogVm.events.collect { event ->
+                                if (event is KatalogEvent.Pesan) showSnackbar(event.teks)
+                            }
+                        }
+                        ProductListScreen(
+                            items = katalogState.barang,
+                            search = katalogState.query,
+                            setSearch = katalogVm::ubahPencarian,
+                            detail = { selectedProductId = it; go(Routes.PROFIL_BARANG) },
+                            edit = { editProductId = it; selectedProductId = it; go(Routes.TAMBAH_BARANG) },
+                            archive = katalogVm::hapusBarang,
+                            manageCategories = { go(Routes.KELOLA_KATEGORI) },
+                            suppliers = { go(Routes.SUPPLIER) },
+                            loading = katalogState.isLoading,
+                            error = katalogState.errorMessage,
+                            retry = katalogVm::refresh,
+                            fileBytes = katalogState.fileBytes,
+                            failedFileIds = katalogState.fileIdsGagalDimuat,
+                            loadFile = katalogVm::muatFile,
+                            add = { editProductId = null; go(Routes.TAMBAH_BARANG) },
+                        )
+                    }
+                    Routes.PROFIL_BARANG -> {
+                        val katalogVm: KatalogViewModel = viewModel(
+                            backStackEntry,
+                            factory = KatalogViewModel.factory(barangRepository),
+                        )
+                        val katalogState by katalogVm.uiState.collectAsStateWithLifecycle()
+                        LaunchedEffect(sesiAktif?.idToko, selectedProductId) {
+                            sesiAktif?.idToko?.let {
+                                katalogVm.muat(it)
+                                katalogVm.muatDetail(selectedProductId)
+                            }
+                        }
+                        LaunchedEffect(katalogVm) {
+                            katalogVm.events.collect { event ->
+                                when (event) {
+                                    is KatalogEvent.Pesan -> showSnackbar(event.teks)
+                                    is KatalogEvent.BarangDihapus -> {
+                                        showSnackbar(resources.getString(R.string.katalog_delete_success, event.status))
+                                        back()
+                                    }
+                                    else -> Unit
+                                }
+                            }
+                        }
+                        ProductDetailScreen(
+                            item = katalogState.barang.firstOrNull { it.barang.id == selectedProductId },
+                            hargaBeliSupplier = katalogState.detail?.hargaBeliSupplier.orEmpty(),
+                            fileBytes = katalogState.fileBytes,
+                            failedFileIds = katalogState.fileIdsGagalDimuat,
+                            onLoadFile = katalogVm::muatFile,
+                            restock = { go(Routes.CATAT_RESTOCK) },
+                            edit = { editProductId = selectedProductId; go(Routes.TAMBAH_BARANG) },
+                            adjust = { go(Routes.PENYESUAIAN_STOK) },
+                            movement = { go(Routes.PERGERAKAN_STOK) },
+                            archive = { katalogVm.hapusBarang(selectedProductId) },
+                        )
+                    }
+                    Routes.TAMBAH_BARANG -> {
+                        val katalogVm: KatalogViewModel = viewModel(
+                            backStackEntry,
+                            factory = KatalogViewModel.factory(barangRepository),
+                        )
+                        val katalogState by katalogVm.uiState.collectAsStateWithLifecycle()
+                        LaunchedEffect(sesiAktif?.idToko, editProductId) {
+                            sesiAktif?.idToko?.let { id ->
+                                katalogVm.muat(id)
+                                editProductId?.let(katalogVm::muatDetail)
+                            }
+                            katalogVm.resetFotoUnggahan()
+                        }
+                        LaunchedEffect(katalogVm) {
+                            katalogVm.events.collect { event ->
+                                when (event) {
+                                    KatalogEvent.BarangTersimpan -> {
+                                        showSnackbar(resources.getString(R.string.katalog_saved))
+                                        back()
+                                    }
+                                    is KatalogEvent.Pesan -> showSnackbar(event.teks)
+                                    else -> Unit
+                                }
+                            }
+                        }
+                        ProductFormScreen(
+                            barang = katalogState.barang.firstOrNull { it.barang.id == editProductId },
+                            categories = katalogState.kategori,
+                            suppliers = katalogState.supplier,
+                            fileBytes = katalogState.fileBytes,
+                            failedFileIds = katalogState.fileIdsGagalDimuat,
+                            uploadedPhotoFileId = katalogState.fotoTerunggahFileId,
+                            uploadingPhoto = katalogState.isUploadingFoto,
+                            saving = katalogState.isSaving,
+                            onUploadPhoto = katalogVm::unggahFoto,
+                            onLoadFile = katalogVm::muatFile,
+                            onCreateCategory = { katalogVm.simpanKategori(null, it) },
+                            onManageCategories = { go(Routes.KELOLA_KATEGORI) },
+                            save = { katalogVm.simpanBarang(it, editProductId) },
+                            back = { back() },
+                        )
+                    }
+                    Routes.KELOLA_KATEGORI -> {
+                        val katalogVm: KatalogViewModel = viewModel(
+                            backStackEntry,
+                            factory = KatalogViewModel.factory(barangRepository),
+                        )
+                        val katalogState by katalogVm.uiState.collectAsStateWithLifecycle()
+                        LaunchedEffect(sesiAktif?.idToko) {
+                            sesiAktif?.idToko?.let(katalogVm::muat)
+                        }
+                        LaunchedEffect(katalogVm) {
+                            katalogVm.events.collect { event ->
+                                if (event is KatalogEvent.Pesan) showSnackbar(event.teks)
+                            }
+                        }
+                        CategoryManagementScreen(
+                            categories = katalogState.kategoriTampilan,
+                            save = katalogVm::simpanKategori,
+                            delete = katalogVm::hapusKategori,
+                        )
+                    }
+                    Routes.CATAT_RESTOCK -> {
+                        val katalogVm: KatalogViewModel = viewModel(
+                            backStackEntry,
+                            factory = KatalogViewModel.factory(barangRepository),
+                        )
+                        val katalogState by katalogVm.uiState.collectAsStateWithLifecycle()
+                        LaunchedEffect(sesiAktif?.idToko) {
+                            sesiAktif?.idToko?.let(katalogVm::muat)
+                        }
+                        LaunchedEffect(katalogVm) {
+                            katalogVm.events.collect { event ->
+                                when (event) {
+                                    KatalogEvent.StokTersimpan -> {
+                                        showSnackbar(resources.getString(R.string.restock_saved))
+                                        back()
+                                    }
+                                    is KatalogEvent.Pesan -> showSnackbar(event.teks)
+                                    else -> Unit
+                                }
+                            }
+                        }
+                        RestockScreen(
+                            products = katalogState.barang.filter { it.barang.status == com.aura.app.core.model.StatusBarang.AKTIF },
+                            suppliers = katalogState.supplier,
+                            initialProductId = selectedProductId,
+                            saving = katalogState.isSaving,
+                            creatingSupplier = katalogState.isSavingSupplier,
+                            save = katalogVm::catatRestock,
+                            createSupplier = { katalogVm.simpanSupplier(null, it, null, null) },
+                            manageSuppliers = { go(Routes.SUPPLIER) },
+                            back = { back() },
+                        )
+                    }
+                    Routes.PENYESUAIAN_STOK -> {
+                        val katalogVm: KatalogViewModel = viewModel(
+                            backStackEntry,
+                            factory = KatalogViewModel.factory(barangRepository),
+                        )
+                        val katalogState by katalogVm.uiState.collectAsStateWithLifecycle()
+                        LaunchedEffect(sesiAktif?.idToko) {
+                            sesiAktif?.idToko?.let(katalogVm::muat)
+                        }
+                        LaunchedEffect(katalogVm) {
+                            katalogVm.events.collect { event ->
+                                when (event) {
+                                    KatalogEvent.StokTersimpan -> {
+                                        showSnackbar(resources.getString(R.string.adjustment_saved))
+                                        back()
+                                    }
+                                    is KatalogEvent.Pesan -> showSnackbar(event.teks)
+                                    else -> Unit
+                                }
+                            }
+                        }
+                        AdjustmentScreen(
+                            products = katalogState.barang,
+                            initialProductId = selectedProductId,
+                            saving = katalogState.isSaving,
+                            save = katalogVm::catatPenyesuaian,
+                            back = { back() },
+                        )
+                    }
+                    Routes.PERGERAKAN_STOK -> {
+                        val katalogVm: KatalogViewModel = viewModel(
+                            backStackEntry,
+                            factory = KatalogViewModel.factory(barangRepository),
+                        )
+                        val katalogState by katalogVm.uiState.collectAsStateWithLifecycle()
+                        LaunchedEffect(sesiAktif?.idToko, selectedProductId) {
+                            sesiAktif?.idToko?.let {
+                                katalogVm.muatPergerakan(it, selectedProductId.takeIf(String::isNotBlank))
+                            }
+                        }
+                        MovementScreen(
+                            items = katalogState.pergerakan.filter {
+                                selectedProductId.isBlank() || it.barangId == selectedProductId
+                            },
+                            nextCursor = katalogState.pergerakanNextCursor,
+                            loading = katalogState.isLoadingPergerakan,
+                            loadingMore = katalogState.isLoadingMorePergerakan,
+                            error = katalogState.errorMessage,
+                            retry = {
+                                sesiAktif?.idToko?.let {
+                                    katalogVm.muatPergerakan(
+                                        it,
+                                        selectedProductId.takeIf(String::isNotBlank),
+                                    )
+                                }
+                            },
+                            loadMore = { katalogVm.muatPergerakanBerikutnya(selectedProductId) },
+                        )
+                    }
+                    Routes.SUPPLIER -> {
+                        val katalogVm: KatalogViewModel = viewModel(
+                            backStackEntry,
+                            factory = KatalogViewModel.factory(barangRepository),
+                        )
+                        val katalogState by katalogVm.uiState.collectAsStateWithLifecycle()
+                        LaunchedEffect(sesiAktif?.idToko) {
+                            sesiAktif?.idToko?.let(katalogVm::muat)
+                        }
+                        LaunchedEffect(katalogVm) {
+                            katalogVm.events.collect { event ->
+                                when (event) {
+                                    is KatalogEvent.Pesan -> showSnackbar(event.teks)
+                                    is KatalogEvent.SupplierBerhasilDihapus -> showSnackbar(
+                                        resources.getString(
+                                            if (event.dihapusPermanen) R.string.katalog_supplier_deleted else R.string.katalog_supplier_deactivated,
+                                        ),
+                                    )
+                                    else -> Unit
+                                }
+                            }
+                        }
+                        SupplierScreen(
+                            items = katalogState.supplier,
+                            save = katalogVm::simpanSupplier,
+                            delete = katalogVm::hapusSupplier,
+                            setStatus = katalogVm::ubahStatusSupplier,
+                            detail = { selectedSupplierId = it; go(Routes.PROFIL_SUPPLIER) },
+                            onMessage = ::showSnackbar,
+                        )
+                    }
+                    Routes.PROFIL_SUPPLIER -> {
+                        val katalogVm: KatalogViewModel = viewModel(
+                            backStackEntry,
+                            factory = KatalogViewModel.factory(barangRepository),
+                        )
+                        val katalogState by katalogVm.uiState.collectAsStateWithLifecycle()
+                        LaunchedEffect(sesiAktif?.idToko, selectedSupplierId) {
+                            sesiAktif?.idToko?.let {
+                                katalogVm.muat(it)
+                                katalogVm.muatDetailSupplier(selectedSupplierId)
+                            }
+                        }
+                        LaunchedEffect(katalogVm) {
+                            katalogVm.events.collect { event ->
+                                when (event) {
+                                    is KatalogEvent.Pesan -> showSnackbar(event.teks)
+                                    is KatalogEvent.SupplierBerhasilDihapus -> {
+                                        showSnackbar(resources.getString(if (event.dihapusPermanen) R.string.katalog_supplier_deleted else R.string.katalog_supplier_deactivated))
+                                        back()
+                                    }
+                                    else -> Unit
+                                }
+                            }
+                        }
+                        SupplierDetailScreen(
+                            detail = katalogState.detailSupplier,
+                            onDelete = katalogVm::hapusSupplier,
+                            onMessage = ::showSnackbar,
+                        )
+                    }
                     Routes.RIWAYAT_AKTIVITAS -> ActivityScreen(activities)
-                    Routes.METODE_PEMBAYARAN -> PaymentSettingsScreen(store?.bankInfo ?: "", { vm.updateBankInfo(it) }, { vm.updateQris(it) })
-                    Routes.K1_BERANDA_KASIR -> CashierScreen(
-                        items = products,
-                        search = search,
-                        setSearch = { search = it },
-                        add = { vm.addToCart(it) },
-                        cart = { go(Routes.K2_CATAT_TRANSAKSI) },
-                        history = { go(Routes.RIWAYAT_HARI_INI) },
-                        avatar = { showAvatar = true },
-                        cartItems = cart,
-                        onChangeQty = { id, delta -> vm.changeCart(id, delta) },
+                    Routes.METODE_PEMBAYARAN -> PaymentSettingsScreen(
+                        uiState = keuanganState,
+                        onRecipientChange = keuanganVm::ubahNamaPenerima,
+                        onAccountInfoChange = keuanganVm::ubahInfoRekening,
+                        onUploadQris = keuanganVm::unggahQris,
+                        onRemoveQris = keuanganVm::hapusQris,
+                        onSave = keuanganVm::simpanMetodePembayaran,
+                        onLoadFile = keuanganVm::muatFile,
                     )
+                    Routes.PENGATURAN_TOKO -> PengaturanTokoScreen(
+                        uiState = keuanganState,
+                        onNameChange = keuanganVm::ubahNamaToko,
+                        onBusinessTypeChange = keuanganVm::ubahJenisUsaha,
+                        onAddressChange = keuanganVm::ubahAlamatToko,
+                        onOpeningBalanceChange = keuanganVm::ubahSaldoAwal,
+                        onSaveStore = keuanganVm::simpanPengaturanToko,
+                        onSaveOpeningBalance = keuanganVm::koreksiSaldoAwal,
+                    )
+                    Routes.K1_BERANDA_KASIR -> {
+                        val katalogVm: KatalogViewModel = viewModel(
+                            backStackEntry,
+                            factory = KatalogViewModel.factory(barangRepository),
+                        )
+                        val katalogState by katalogVm.uiState.collectAsStateWithLifecycle()
+                        LaunchedEffect(sesiAktif?.idToko) {
+                            sesiAktif?.idToko?.let(katalogVm::muat)
+                        }
+                        LaunchedEffect(katalogVm) {
+                            katalogVm.events.collect { event ->
+                                if (event is KatalogEvent.Pesan) showSnackbar(event.teks)
+                            }
+                        }
+                        CashierScreen(
+                            items = katalogState.barang.filter { it.barang.status == com.aura.app.core.model.StatusBarang.AKTIF },
+                            search = search,
+                            setSearch = { search = it },
+                            fileBytes = katalogState.fileBytes,
+                            failedFileIds = katalogState.fileIdsGagalDimuat,
+                            loadFile = katalogVm::muatFile,
+                            add = kasirVm::tambahBarang,
+                            cart = { go(Routes.K2_CATAT_TRANSAKSI) },
+                            history = { go(Routes.RIWAYAT_HARI_INI) },
+                            avatar = { showAvatar = true },
+                            cartItems = kasirState.keranjang,
+                            onChangeQty = kasirVm::ubahJumlah,
+                        )
+                    }
                     Routes.K2_CATAT_TRANSAKSI -> CartScreen(
-                        cart = cart,
-                        change = { id, delta -> vm.changeCart(id, delta) },
+                        cart = kasirState.keranjang,
+                        change = kasirVm::ubahJumlah,
                         pay = { go(Routes.K3_PEMBAYARAN) },
                         back = { back() },
                     )
-                    Routes.K3_PEMBAYARAN -> PaymentScreen(
-                        cart.sumOf { it.unitPrice * it.quantity },
-                        { method, received ->
-                            vm.checkout(method, received) {
-                                go(if (sesiAktif?.peran == Peran.OWNER) Routes.K4_TRANSAKSI_BERHASIL_OWNER else Routes.K4_TRANSAKSI_BERHASIL)
-                            }
-                        },
-                        { back() },
-                    )
+                    Routes.K3_PEMBAYARAN -> {
+                        val qrisFileId = kasirState.metodePembayaran?.qrisFileId?.takeIf(String::isNotBlank)
+                        PaymentScreen(
+                            total = kasirState.keranjang.sumOf { it.hargaJual * it.jumlah },
+                            metodePembayaran = kasirState.metodePembayaran,
+                            isLoadingMetode = kasirState.isLoadingMetodePembayaran,
+                            metodeError = kasirState.metodePembayaranError?.let {
+                                it.detail ?: resources.getString(it.fallback)
+                            },
+                            retryMetode = kasirVm::muatMetodePembayaran,
+                            qrisBytes = kasirState.qrisBytes.takeIf {
+                                kasirState.qrisFileIdLoaded == qrisFileId
+                            },
+                            qrisLoading = qrisFileId != null &&
+                                    kasirState.qrisFileIdLoading == qrisFileId,
+                            qrisError = kasirState.qrisError?.takeIf {
+                                kasirState.qrisFileIdFailed == qrisFileId
+                            }?.let { it.detail ?: resources.getString(it.fallback) },
+                            loadQris = kasirVm::muatQris,
+                            retryQris = {
+                                qrisFileId?.let { kasirVm.muatQris(it, ulangi = true) }
+                            },
+                            isSaving = kasirState.isSavingTransaksi,
+                            requestTertunda = kasirState.permintaanTransaksiTertunda,
+                            checkoutError = kasirState.checkoutError?.let {
+                                it.detail ?: resources.getString(it.fallback)
+                            },
+                            checkout = kasirVm::selesaikanTransaksi,
+                            copyInfoRekening = { info ->
+                                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                clipboard.setPrimaryClip(
+                                    ClipData.newPlainText(
+                                        resources.getString(R.string.kasir_transfer_info_title),
+                                        info,
+                                    ),
+                                )
+                                showSnackbar(resources.getString(R.string.kasir_account_copied))
+                            },
+                            back = { back() },
+                        )
+                    }
                     Routes.K4_TRANSAKSI_BERHASIL, Routes.K4_TRANSAKSI_BERHASIL_OWNER -> SuccessScreen(
-                        invoice,
-                        lastTotal,
+                        kasirState.invoiceTerakhir,
+                        kasirState.totalTerakhir,
                         sesiAktif?.peran == Peran.OWNER,
                         { root(Routes.K1_BERANDA_KASIR) },
                         { go(if (sesiAktif?.peran == Peran.OWNER) Routes.RIWAYAT_HARI_INI_OWNER else Routes.RIWAYAT_HARI_INI) },
                         { root(Routes.DASHBOARD) },
                     )
                     Routes.RIWAYAT_HARI_INI, Routes.RIWAYAT_HARI_INI_OWNER -> HistoryScreen(
-                        transactions,
-                        { tx ->
-                            selectedTransaction = tx.invoiceNo
-                            isOwnerCancel = sesiAktif?.peran == Peran.OWNER
-                            cancelInvoice = tx.invoiceNo
+                        items = kasirState.transaksiHariIni,
+                        isLoading = kasirState.isLoadingRiwayat,
+                        errorMessage = kasirState.riwayatError?.let {
+                            it.detail ?: resources.getString(it.fallback)
                         },
-                        sesiAktif?.peran == Peran.KASIR,
+                        retry = kasirVm::muatRiwayatHariIni,
+                        openCancel = { transaksi ->
+                            isOwnerCancel = sesiAktif?.peran == Peran.OWNER
+                            cancelTransaksiId = transaksi.id
+                            cancelReason = kasirState.pengajuanPembatalanTertunda[transaksi.id]?.alasan.orEmpty()
+                        },
+                        isCashier = sesiAktif?.peran == Peran.KASIR,
+                        submittedCancellationIds = kasirState.pengajuanPembatalanTertunda
+                            .filterValues { it.terkirim }
+                            .keys,
                     )
                     else -> WelcomeScreen({ root(Routes.LOGIN) }, { root(Routes.REGISTER_STEP1) })
                 }
-                if (busy) LinearProgressIndicator(Modifier.fillMaxWidth().align(Alignment.TopCenter), color = Red)
+                if (
+                    busy || kasirState.isSavingTransaksi || kasirState.isSavingPembatalan ||
+                    kasirState.isLoadingRiwayat || kasirState.isLoadingMetodePembayaran
+                ) {
+                    LinearProgressIndicator(Modifier.fillMaxWidth().align(Alignment.TopCenter), color = Red)
+                }
             }
         }
     }
@@ -684,26 +1183,81 @@ fun AuraNavHost(
         )
     }
 
-    if (cancelInvoice != null) {
+    cancelTransaksiId?.let { transaksiId ->
         AlertDialog(
-            onDismissRequest = { cancelInvoice = null; cancelReason = "" },
-            title = { Text(if (isOwnerCancel) "Batalkan Transaksi?" else "Ajukan Pembatalan?") },
+            onDismissRequest = {
+                if (!kasirState.isSavingPembatalan) {
+                    cancelTransaksiId = null
+                    cancelReason = ""
+                }
+            },
+            title = {
+                Text(
+                    stringResource(
+                        if (isOwnerCancel) {
+                            R.string.kasir_cancel_owner_title
+                        } else {
+                            R.string.kasir_cancel_cashier_title
+                        },
+                    ),
+                )
+            },
             text = {
                 Column {
-                    Text("Alasan wajib diisi. Stok akan dikembalikan setelah pembatalan Owner disetujui.", fontSize = 12.sp)
-                    OutlinedTextField(cancelReason, { cancelReason = it }, label = { Text("Alasan pembatalan") }, modifier = Modifier.fillMaxWidth())
+                    Text(
+                        stringResource(
+                            if (isOwnerCancel) {
+                                R.string.kasir_cancel_owner_message
+                            } else {
+                                R.string.kasir_cancel_cashier_message
+                            },
+                        ),
+                        fontSize = 12.sp,
+                    )
+                    OutlinedTextField(
+                        value = cancelReason,
+                        onValueChange = { cancelReason = it },
+                        label = { Text(stringResource(R.string.kasir_cancel_reason_label)) },
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = !kasirState.isSavingPembatalan &&
+                                (isOwnerCancel || transaksiId !in kasirState.pengajuanPembatalanTertunda),
+                    )
                 }
             },
             confirmButton = {
-                TextButton(onClick = {
-                    if (cancelReason.isNotBlank()) {
-                        vm.cancelTransaction(cancelInvoice!!, cancelReason, !isOwnerCancel)
-                        cancelInvoice = null
-                        cancelReason = ""
-                    }
-                }) { Text(if (isOwnerCancel) "Batalkan" else "Kirim Pengajuan", color = Red) }
+                TextButton(
+                    enabled = cancelReason.isNotBlank() && !kasirState.isSavingPembatalan,
+                    onClick = {
+                        kasirVm.batalkanAtauAjukan(
+                            transaksiId = transaksiId,
+                            alasan = cancelReason.trim(),
+                            olehOwner = isOwnerCancel,
+                        )
+                    },
+                ) {
+                    Text(
+                        stringResource(
+                            if (isOwnerCancel) {
+                                R.string.kasir_cancel_owner_confirm
+                            } else {
+                                R.string.kasir_cancel_cashier_confirm
+                            },
+                        ),
+                        color = Red,
+                    )
+                }
             },
-            dismissButton = { TextButton(onClick = { cancelInvoice = null; cancelReason = "" }) { Text("Kembali") } },
+            dismissButton = {
+                TextButton(
+                    enabled = !kasirState.isSavingPembatalan,
+                    onClick = {
+                        cancelTransaksiId = null
+                        cancelReason = ""
+                    },
+                ) {
+                    Text(stringResource(R.string.kasir_cancel_dismiss))
+                }
+            },
         )
     }
 
@@ -726,8 +1280,10 @@ private fun routeTitle(route: String) = mapOf(
     Routes.UBAH_KATA_SANDI to "Ubah Kata Sandi",
     Routes.NOTIFIKASI to "Notifikasi",
     Routes.PENGELUARAN to "Pengeluaran",
+    Routes.DETAIL_PENGELUARAN to "Detail Pengeluaran",
     Routes.CATAT_PENGELUARAN to "Catat Pengeluaran",
     Routes.PEMASUKAN to "Pemasukan",
+    Routes.DETAIL_PEMASUKAN to "Detail Pemasukan",
     Routes.CATAT_PEMASUKAN to "Catat Pemasukan",
     Routes.MANAJEMEN_BARANG to "Manajemen Barang",
     Routes.PROFIL_BARANG to "Profil Barang",
@@ -736,12 +1292,15 @@ private fun routeTitle(route: String) = mapOf(
     Routes.PENYESUAIAN_STOK to "Penyesuaian Stok",
     Routes.PERGERAKAN_STOK to "Pergerakan Stok",
     Routes.SUPPLIER to "Supplier",
+    Routes.PROFIL_SUPPLIER to "Detail Supplier",
+    Routes.KELOLA_KATEGORI to "Kelola Kategori",
     Routes.RIWAYAT_AKTIVITAS to "Riwayat Aktivitas",
     Routes.PENGATURAN to "Pengaturan",
     Routes.MANAJEMEN_AKUN_KASIR to "Akun Kasir",
     Routes.METODE_PEMBAYARAN to "Metode Pembayaran",
+    Routes.PENGATURAN_TOKO to "Pengaturan Toko",
     Routes.K1_BERANDA_KASIR to "Beranda Kasir",
-    Routes.K2_CATAT_TRANSAKSI to "Keranjang",
+    Routes.K2_CATAT_TRANSAKSI to "Catat Transaksi",
     Routes.K3_PEMBAYARAN to "Pembayaran",
     Routes.K4_TRANSAKSI_BERHASIL to "Transaksi Berhasil",
     Routes.K4_TRANSAKSI_BERHASIL_OWNER to "Transaksi Berhasil",

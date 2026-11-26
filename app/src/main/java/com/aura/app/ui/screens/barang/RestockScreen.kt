@@ -1,48 +1,173 @@
 package com.aura.app.ui.screens.barang
 
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
-import android.content.Intent
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.res.stringResource
-import androidx.compose.foundation.*
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.*
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.*
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.ui.Alignment
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.*
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.*
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.*
+import androidx.compose.ui.unit.dp
 import com.aura.app.R
-import com.aura.app.data.*
-import com.aura.app.ui.components.*
-import com.aura.app.ui.theme.*
 import com.aura.app.core.format.RupiahFormatter
-import com.aura.app.core.format.TanggalFormatter
-import java.util.Locale
+import com.aura.app.core.model.StatusAkun
+import com.aura.app.data.local.entity.SupplierEntity
+import com.aura.app.ui.barang.BarangTampilan
+import com.aura.app.ui.components.Heading
+import com.aura.app.ui.components.Input
+import com.aura.app.ui.components.Page
+import com.aura.app.ui.components.Primary
+import com.aura.app.ui.components.Secondary
+import com.aura.app.ui.theme.Red
+import java.math.BigDecimal
+import java.math.RoundingMode
 
 @OptIn(ExperimentalMaterial3Api::class)
-@Composable internal fun RestockScreen(products:List<ProductEntity>,suppliers:List<SupplierEntity>,save:(String,Int,Long,String,String)->Unit,back:()->Unit, modifier: Modifier = Modifier) {
-    var productId by rememberSaveable{mutableStateOf(products.firstOrNull()?.id?:"")};var qty by rememberSaveable{mutableStateOf("1")};var price by rememberSaveable{mutableStateOf("")};var supplier by rememberSaveable{mutableStateOf("")};var note by rememberSaveable{mutableStateOf("")}
-    Page(modifier = modifier) { Heading(stringResource(R.string.screen_copy_069),"Stok, pengeluaran pembelian, saldo, dan HPP diperbarui otomatis")
-        if(products.isNotEmpty()) {Text(stringResource(R.string.screen_copy_070),fontWeight=FontWeight.Bold,fontSize=12.sp);var expanded by remember{mutableStateOf(false)}
-            ExposedDropdownMenuBox(expanded,{expanded=it}){OutlinedTextField(products.firstOrNull{it.id==productId}?.name?:"Pilih barang",{},Modifier.menuAnchor().fillMaxWidth(),readOnly=true);ExposedDropdownMenu(expanded,{expanded=false}){products.forEach{DropdownMenuItem(text={Text(it.name)},onClick={productId=it.id;expanded=false})}}}}
-        Input(stringResource(R.string.screen_copy_071),qty,{qty=it},number=true);Input(stringResource(R.string.screen_copy_072),price,{price=it},number=true)
-        Text(stringResource(R.string.screen_copy_073),fontWeight=FontWeight.Bold,fontSize=12.sp);var expandedS by remember{mutableStateOf(false)}
-        ExposedDropdownMenuBox(expandedS,{expandedS=it}){OutlinedTextField(suppliers.firstOrNull{it.id==supplier}?.name?: "Pilih supplier (opsional)",{},Modifier.menuAnchor().fillMaxWidth(),readOnly=true);ExposedDropdownMenu(expandedS,{expandedS=false}){DropdownMenuItem(text={Text(stringResource(R.string.screen_copy_074))},onClick={supplier="";expandedS=false});suppliers.forEach{DropdownMenuItem(text={Text(it.name)},onClick={supplier=it.id;expandedS=false})}}}
-        Input(stringResource(R.string.screen_copy_041),note,{note=it})
-        val total=(qty.toLongOrNull()?:0L)*(price.toLongOrNull()?:0L);Text("Total Pembelian: ${money(total)}",fontWeight=FontWeight.Bold,color=Red)
-        Primary(stringResource(R.string.screen_copy_075),{save(productId,qty.toIntOrNull()?:0,price.toLongOrNull()?:0,supplier,note)},productId.isNotBlank()&&(qty.toIntOrNull()?:0)>0&&(price.toLongOrNull()?:-1)>=0);Secondary(stringResource(R.string.screen_copy_043),back)
+@Composable
+internal fun RestockScreen(
+    modifier: Modifier = Modifier,
+    products: List<BarangTampilan>,
+    suppliers: List<SupplierEntity>,
+    initialProductId: String?,
+    saving: Boolean,
+    creatingSupplier: Boolean,
+    save: (String, String, Int, Long, String) -> Unit,
+    createSupplier: (String) -> Unit,
+    manageSuppliers: () -> Unit,
+    back: () -> Unit,
+) {
+    val activeSuppliers = suppliers.filter { it.status == StatusAkun.AKTIF }
+    var productId by rememberSaveable { mutableStateOf(initialProductId ?: products.firstOrNull()?.barang?.id.orEmpty()) }
+    var supplierId by rememberSaveable { mutableStateOf(activeSuppliers.firstOrNull()?.id.orEmpty()) }
+    var quantityText by rememberSaveable { mutableStateOf("1") }
+    var totalText by rememberSaveable { mutableStateOf("") }
+    var note by rememberSaveable { mutableStateOf("") }
+    var newSupplierName by rememberSaveable { mutableStateOf("") }
+    var supplierInputFocused by remember { mutableStateOf(false) }
+    var pendingSupplierName by remember { mutableStateOf<String?>(null) }
+    var supplierIdsBeforeCreate by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var productExpanded by remember { mutableStateOf(false) }
+    var supplierExpanded by remember { mutableStateOf(false) }
+    val quantity = quantityText.toIntOrNull() ?: 0
+    val total = totalText.toLongOrNull() ?: -1L
+    val unitPrice = if (quantity > 0 && total >= 0) {
+        BigDecimal.valueOf(total).divide(BigDecimal.valueOf(quantity.toLong()), 0, RoundingMode.HALF_UP).longValueExact()
+    } else {
+        null
+    }
+
+    androidx.compose.runtime.LaunchedEffect(activeSuppliers, pendingSupplierName) {
+        val requestedName = pendingSupplierName ?: return@LaunchedEffect
+        val createdSupplier = activeSuppliers.firstOrNull {
+            it.id !in supplierIdsBeforeCreate && it.nama.equals(requestedName, ignoreCase = true)
+        } ?: return@LaunchedEffect
+        supplierId = createdSupplier.id
+        newSupplierName = ""
+        pendingSupplierName = null
+    }
+
+    Page(modifier = modifier) {
+        Heading(stringResource(R.string.screen_copy_069), stringResource(R.string.restock_effects))
+        ExposedDropdownMenuBox(productExpanded, { productExpanded = it }) {
+            OutlinedTextField(
+                value = products.firstOrNull { it.barang.id == productId }?.barang?.nama
+                    ?: stringResource(R.string.restock_select_product),
+                onValueChange = {},
+                modifier = Modifier.menuAnchor().fillMaxWidth(),
+                readOnly = true,
+                label = { Text(stringResource(R.string.screen_copy_070)) },
+            )
+            ExposedDropdownMenu(productExpanded, { productExpanded = false }) {
+                products.forEach { item ->
+                    DropdownMenuItem(
+                        text = { Text(item.barang.nama) },
+                        onClick = { productId = item.barang.id; productExpanded = false },
+                    )
+                }
+            }
+        }
+        ExposedDropdownMenuBox(supplierExpanded, { supplierExpanded = it }) {
+            OutlinedTextField(
+                value = activeSuppliers.firstOrNull { it.id == supplierId }?.nama
+                    ?: stringResource(R.string.restock_select_supplier),
+                onValueChange = {},
+                modifier = Modifier.menuAnchor().fillMaxWidth(),
+                readOnly = true,
+                label = { Text(stringResource(R.string.katalog_select_supplier)) },
+            )
+            ExposedDropdownMenu(supplierExpanded, { supplierExpanded = false }) {
+                activeSuppliers.forEach { supplier ->
+                    DropdownMenuItem(
+                        text = { Text(supplier.nama) },
+                        onClick = { supplierId = supplier.id; supplierExpanded = false },
+                    )
+                }
+            }
+        }
+        OutlinedTextField(
+            value = newSupplierName,
+            onValueChange = { newSupplierName = it },
+            modifier = Modifier.fillMaxWidth().onFocusChanged { supplierInputFocused = it.isFocused },
+            enabled = !creatingSupplier,
+            label = { Text(stringResource(R.string.katalog_supplier_name)) },
+            singleLine = true,
+        )
+        if (supplierInputFocused || newSupplierName.isNotBlank()) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(
+                    onClick = {
+                        val requestedName = newSupplierName.trim()
+                        supplierIdsBeforeCreate = activeSuppliers.map { it.id }.toSet()
+                        pendingSupplierName = requestedName
+                        createSupplier(requestedName)
+                    },
+                    enabled = newSupplierName.isNotBlank() && !creatingSupplier,
+                    colors = ButtonDefaults.buttonColors(containerColor = Red),
+                ) {
+                    Text(
+                        if (creatingSupplier) stringResource(R.string.katalog_saving)
+                        else stringResource(R.string.katalog_create_supplier),
+                    )
+                }
+                TextButton(
+                    onClick = { newSupplierName = ""; pendingSupplierName = null },
+                    enabled = !creatingSupplier,
+                ) {
+                    Text(stringResource(R.string.screen_copy_043))
+                }
+            }
+        }
+        TextButton(onClick = manageSuppliers) {
+            Text(stringResource(R.string.restock_manage_suppliers))
+        }
+        Input(stringResource(R.string.restock_quantity), quantityText, { quantityText = it }, number = true)
+        Input(stringResource(R.string.restock_total_paid), totalText, { totalText = it }, number = true)
+        unitPrice?.let {
+            Text(
+                stringResource(R.string.restock_unit_price, RupiahFormatter.format(it)),
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
+        Input(stringResource(R.string.screen_copy_041), note, { note = it })
+        Primary(
+            stringResource(R.string.screen_copy_075),
+            { save(productId, supplierId, quantity, total, note) },
+            !saving && productId.isNotBlank() && supplierId.isNotBlank() && quantity > 0 && total >= 0,
+        )
+        Secondary(stringResource(R.string.screen_copy_043), back)
     }
 }

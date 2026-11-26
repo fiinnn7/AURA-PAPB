@@ -158,6 +158,11 @@ internal data class PergerakanStokResponse(
     val stokSebelum: Int,
     val stokSesudah: Int,
     val dibuatPada: Long,
+    val akunId: UUID? = null,
+    val namaAkun: String? = null,
+    val referensiId: UUID? = null,
+    val jenisReferensi: String? = null,
+    val alasan: String? = null,
 )
 
 internal data class KategoriResponse(

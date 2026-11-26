@@ -4,6 +4,9 @@ import com.aura.server.config.AppConfig
 import com.aura.server.db.DatabaseFactory
 import com.aura.server.auth.authComponents
 import com.aura.server.catalog.catalogComponents
+import com.aura.server.stock.stockComponents
+import com.aura.server.sales.salesComponents
+import com.aura.server.finance.financeComponents
 import com.aura.server.plugins.configureAuthentication
 import com.aura.server.plugins.configureDefaultHeaders
 import com.aura.server.plugins.configureLogging
@@ -28,6 +31,9 @@ fun Application.module() {
     val dataSource = DatabaseFactory.initialize(config)
     val auth = authComponents(config.jwtSecret)
     val catalog = catalogComponents(config.uploadDirectory)
+    val stock = stockComponents(catalog.service)
+    val sales = salesComponents()
+    val finance = financeComponents()
     val deletionWorker = Executors.newSingleThreadScheduledExecutor { task ->
         Thread(task, "aura-owner-deletion-worker").apply { isDaemon = true }
     }
@@ -41,18 +47,21 @@ fun Application.module() {
         deletionWorker.shutdownNow()
         dataSource.close()
     }
-    configureHttp(auth, catalog = catalog)
+    configureHttp(auth, catalog = catalog, stock = stock, sales = sales, finance = finance)
 }
 
 internal fun Application.configureHttp(
     auth: com.aura.server.auth.AuthComponents? = null,
     catalog: com.aura.server.catalog.CatalogComponents? = null,
     additionalRoutes: Routing.() -> Unit = {},
+    stock: com.aura.server.stock.StockComponents? = null,
+    sales: com.aura.server.sales.SalesComponents? = null,
+    finance: com.aura.server.finance.FinanceComponents? = null,
 ) {
     configureSerialization()
     configureStatusPages()
     auth?.let(::configureAuthentication)
     configureLogging()
     configureDefaultHeaders()
-    configureRouting(auth, catalog, additionalRoutes)
+    configureRouting(auth, catalog, additionalRoutes, stock, sales, finance)
 }

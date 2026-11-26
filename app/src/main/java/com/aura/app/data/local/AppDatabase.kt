@@ -24,6 +24,7 @@ import com.aura.app.data.local.entity.KategoriEntity
 import com.aura.app.data.local.entity.LogAktivitasEntity
 import com.aura.app.data.local.entity.NotifikasiEntity
 import com.aura.app.data.local.entity.PemasukanKustomEntity
+import com.aura.app.data.local.entity.PemasukanPenjualanCacheEntity
 import com.aura.app.data.local.entity.PengeluaranEntity
 import com.aura.app.data.local.entity.PergerakanStokEntity
 import com.aura.app.data.local.entity.SupplierEntity
@@ -50,10 +51,11 @@ import kotlinx.coroutines.withContext
         PergerakanStokEntity::class,
         PengeluaranEntity::class,
         PemasukanKustomEntity::class,
+        PemasukanPenjualanCacheEntity::class,
         NotifikasiEntity::class,
         LogAktivitasEntity::class,
     ],
-    version = 1,
+    version = 2,
     exportSchema = false,
 )
 @TypeConverters(Converters::class)

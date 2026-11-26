@@ -2,39 +2,82 @@ package com.aura.app.ui.screens.keuangan
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import android.content.Intent
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.res.stringResource
-import androidx.compose.foundation.*
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.*
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.*
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.ui.Alignment
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.*
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.*
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.*
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
 import com.aura.app.R
-import com.aura.app.data.*
-import com.aura.app.ui.components.*
-import com.aura.app.ui.theme.*
-import com.aura.app.core.format.RupiahFormatter
-import com.aura.app.core.format.TanggalFormatter
-import java.util.Locale
+import com.aura.app.ui.components.Heading
+import com.aura.app.ui.components.Input
+import com.aura.app.ui.components.Page
+import com.aura.app.ui.components.Panel
+import com.aura.app.ui.components.Primary
+import com.aura.app.ui.components.Secondary
+import com.aura.app.ui.keuangan.KeuanganUiState
 
-@Composable internal fun ExpenseFormScreen(save:(String,Long,String,Boolean)->Unit,back:()->Unit, modifier: Modifier = Modifier) {
-    var category by rememberSaveable{mutableStateOf("Operasional Toko")};var amount by rememberSaveable{mutableStateOf("")};var note by rememberSaveable{mutableStateOf("")};var prive by rememberSaveable{mutableStateOf(false)}
-    Page(modifier = modifier) { Heading(stringResource(R.string.screen_copy_121),"Nominal akan mengurangi saldo kas");Input(stringResource(R.string.screen_copy_058),category,{category=it});Input(stringResource(R.string.screen_copy_122),amount,{amount=it},number=true);Input(stringResource(R.string.screen_copy_041),note,{note=it});Row(verticalAlignment=Alignment.CenterVertically){Checkbox(prive,{prive=it});Text(stringResource(R.string.screen_copy_123),fontSize=11.sp)}
-        Primary(stringResource(R.string.screen_copy_124),{save(category,amount.toLongOrNull()?:0,note,prive)},category.isNotBlank()&&(amount.toLongOrNull()?:0)>0);Secondary(stringResource(R.string.screen_copy_043),back)
+@Composable
+internal fun ExpenseFormScreen(
+    uiState: KeuanganUiState,
+    onTitleChange: (String) -> Unit,
+    onTypeChange: (String) -> Unit,
+    onAmountChange: (String) -> Unit,
+    onNoteChange: (String) -> Unit,
+    onUploadEvidence: (android.content.ContentResolver, android.net.Uri) -> Unit,
+    onRemoveEvidence: () -> Unit,
+    onSave: () -> Unit,
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val form = uiState.formPengeluaran
+    val context = LocalContext.current
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) onUploadEvidence(context.contentResolver, uri)
+    }
+    Page(modifier = modifier) {
+        Heading(stringResource(R.string.finance_expense_add), stringResource(R.string.finance_form_expense_hint))
+        uiState.errorMessage?.let { Panel { Text(it) } }
+        Input(stringResource(R.string.finance_title_label), form.judul, onTitleChange)
+        Text(stringResource(R.string.finance_expense_type_label))
+        Row {
+            listOf(
+                "LISTRIK" to R.string.finance_expense_electricity,
+                "SEWA" to R.string.finance_expense_rent,
+                "GAJI" to R.string.finance_expense_salary,
+                "LAINNYA" to R.string.finance_expense_other,
+            ).forEach { (value, label) ->
+                FilterChip(
+                    selected = form.jenisBiaya == value,
+                    onClick = { onTypeChange(value) },
+                    label = { Text(stringResource(label)) },
+                )
+            }
+        }
+        Input(stringResource(R.string.finance_amount_label), form.nominal, onAmountChange, number = true)
+        Input(stringResource(R.string.finance_note_label), form.catatan, onNoteChange)
+        Spacer(Modifier.height(4.dp))
+        androidx.compose.material3.OutlinedButton(onClick = { picker.launch(arrayOf("image/jpeg", "image/png", "image/webp")) }, enabled = !uiState.isUploadingFile) {
+            Text(stringResource(R.string.finance_upload_evidence))
+        }
+        if (uiState.isUploadingFile) CircularProgressIndicator()
+        if (uiState.buktiFileIdUnggahan != null) {
+            Panel {
+                Text(stringResource(R.string.finance_evidence_uploaded))
+                Secondary(stringResource(R.string.finance_remove_evidence), onRemoveEvidence)
+            }
+        }
+        Primary(
+            stringResource(R.string.finance_save_expense),
+            onSave,
+            enabled = !uiState.isSaving && !uiState.isUploadingFile &&
+                form.judul.isNotBlank() && (form.nominal.toLongOrNull() ?: 0L) > 0,
+        )
+        Secondary(stringResource(R.string.action_cancel), onBack)
     }
 }

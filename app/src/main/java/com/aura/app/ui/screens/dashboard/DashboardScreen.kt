@@ -30,16 +30,17 @@ import com.aura.app.ui.components.*
 import com.aura.app.ui.theme.*
 import com.aura.app.core.format.RupiahFormatter
 import com.aura.app.core.format.TanggalFormatter
+import com.aura.app.data.local.entity.TokoEntity
 import java.util.Locale
 
-@Composable internal fun DashboardScreen(store:StoreEntity?,products:List<ProductEntity>,tx:List<TransactionEntity>,records:List<CashRecordEntity>,hide:Boolean,toggle:()->Unit,go:(String)->Unit, modifier: Modifier = Modifier) {
+@Composable internal fun DashboardScreen(store:TokoEntity?,products:List<ProductEntity>,tx:List<TransactionEntity>,records:List<CashRecordEntity>,hide:Boolean,toggle:()->Unit,go:(String)->Unit, modifier: Modifier = Modifier) {
     val today=tx.filter{it.status=="Selesai"}
     val expenses=records.filter{it.kind=="expense"&&!it.isPrive}.sumOf{it.amount}
     Page(modifier = modifier) {
         Text(stringResource(R.string.screen_copy_085),fontSize=12.sp,color=Muted)
-        Heading(store?.name ?: "Ringkasan Toko","${store?.businessType ?: "Retail"} • ${store?.id ?: ""}")
+        Heading(store?.namaToko ?: "Ringkasan Toko","${store?.jenisUsaha ?: "Retail"} • ${store?.idToko ?: ""}")
         Panel {
-            Row(verticalAlignment=Alignment.CenterVertically){Column(Modifier.weight(1f)){Text(stringResource(R.string.screen_copy_086),fontSize=11.sp,color=Muted);Text(if(hide)"Rp ••••••••" else money(store?.balance?:0),fontSize=25.sp,fontWeight=FontWeight.ExtraBold,color=Red)};Text(if(hide)"◉" else "◎",Modifier.clickable{toggle()}.padding(8.dp),fontSize=22.sp,color=Red)}
+            Row(verticalAlignment=Alignment.CenterVertically){Column(Modifier.weight(1f)){Text(stringResource(R.string.screen_copy_086),fontSize=11.sp,color=Muted);Text(if(hide)"Rp ••••••••" else money(store?.saldoKumulatif?:0),fontSize=25.sp,fontWeight=FontWeight.ExtraBold,color=Red)};Text(if(hide)"◉" else "◎",Modifier.clickable{toggle()}.padding(8.dp),fontSize=22.sp,color=Red)}
         }
         Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){Box(Modifier.weight(1f)){Metric(stringResource(R.string.screen_copy_087),money(today.sumOf{it.total}),"${today.size} transaksi")};Box(Modifier.weight(1f)){Metric(stringResource(R.string.screen_copy_088),money(expenses))}}
         Heading(stringResource(R.string.screen_copy_089))

@@ -7,6 +7,7 @@ import com.aura.app.data.local.entity.ItemTransaksiEntity
 import com.aura.app.data.local.entity.LogAktivitasEntity
 import com.aura.app.data.local.entity.NotifikasiEntity
 import com.aura.app.data.local.entity.PemasukanKustomEntity
+import com.aura.app.data.local.entity.PemasukanPenjualanCacheEntity
 import com.aura.app.data.local.entity.PengeluaranEntity
 import com.aura.app.data.local.entity.PergerakanStokEntity
 import com.aura.app.data.local.entity.TransaksiPenjualanEntity
@@ -26,6 +27,12 @@ interface TransaksiDao {
     @Upsert
     suspend fun upsertItems(daftar: List<ItemTransaksiEntity>)
 
+    @Query("DELETE FROM item_transaksi WHERE transaksiId IN (SELECT id FROM transaksi_penjualan WHERE idToko = :idToko)")
+    suspend fun clearItemsByToko(idToko: String)
+
+    @Query("DELETE FROM transaksi_penjualan WHERE idToko = :idToko")
+    suspend fun clearByToko(idToko: String)
+
     @Query("DELETE FROM transaksi_penjualan")
     suspend fun clearAll()
 }
@@ -41,6 +48,12 @@ interface PergerakanStokDao {
     @Upsert
     suspend fun upsertAll(daftar: List<PergerakanStokEntity>)
 
+    @Query("DELETE FROM pergerakan_stok WHERE idToko = :idToko")
+    suspend fun clearByToko(idToko: String)
+
+    @Query("DELETE FROM pergerakan_stok WHERE idToko = :idToko AND barangId = :barangId")
+    suspend fun clearByBarang(idToko: String, barangId: String)
+
     @Query("DELETE FROM pergerakan_stok")
     suspend fun clearAll()
 }
@@ -53,17 +66,26 @@ interface KeuanganDao {
     @Query("SELECT * FROM pemasukan_kustom WHERE idToko = :idToko ORDER BY tanggal DESC, dibuatPada DESC")
     fun observePemasukanKustom(idToko: String): Flow<List<PemasukanKustomEntity>>
 
+    @Query("SELECT * FROM pemasukan_penjualan_cache WHERE idToko = :idToko ORDER BY tanggal DESC")
+    fun observePemasukanPenjualan(idToko: String): Flow<List<PemasukanPenjualanCacheEntity>>
+
     @Upsert
     suspend fun upsertPengeluaran(daftar: List<PengeluaranEntity>)
 
     @Upsert
     suspend fun upsertPemasukanKustom(daftar: List<PemasukanKustomEntity>)
 
-    @Query("DELETE FROM pengeluaran")
-    suspend fun clearPengeluaran()
+    @Upsert
+    suspend fun upsertPemasukanPenjualan(daftar: List<PemasukanPenjualanCacheEntity>)
 
-    @Query("DELETE FROM pemasukan_kustom")
-    suspend fun clearPemasukanKustom()
+    @Query("DELETE FROM pengeluaran WHERE idToko = :idToko")
+    suspend fun clearPengeluaranByToko(idToko: String)
+
+    @Query("DELETE FROM pemasukan_kustom WHERE idToko = :idToko")
+    suspend fun clearPemasukanKustomByToko(idToko: String)
+
+    @Query("DELETE FROM pemasukan_penjualan_cache WHERE idToko = :idToko")
+    suspend fun clearPemasukanPenjualanByToko(idToko: String)
 }
 
 @Dao

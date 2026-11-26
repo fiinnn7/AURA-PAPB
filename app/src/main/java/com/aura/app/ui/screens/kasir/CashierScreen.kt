@@ -9,15 +9,22 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -28,6 +35,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -51,30 +59,33 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aura.app.R
-import com.aura.app.data.CartLineData
-import com.aura.app.data.ProductEntity
-import com.aura.app.ui.components.Heading
-import com.aura.app.ui.components.Page
-import com.aura.app.ui.components.Primary
-import com.aura.app.ui.components.Secondary
-import com.aura.app.ui.components.money
+import com.aura.app.core.format.RupiahFormatter
+import com.aura.app.core.model.StatusStok
+import com.aura.app.data.local.entity.BarangEntity
+import com.aura.app.ui.barang.BarangTampilan
+import com.aura.app.ui.components.ServerFileImage
+import com.aura.app.ui.kasir.BarisKeranjang
+import com.aura.app.ui.theme.Bg
 import com.aura.app.ui.theme.Muted
-import com.aura.app.ui.theme.Purple
 import com.aura.app.ui.theme.Red
+import com.aura.app.ui.theme.Soft
 import kotlinx.coroutines.delay
 
 @Composable
 internal fun CashierScreen(
-    items: List<ProductEntity>,
+    modifier: Modifier = Modifier,
+    items: List<BarangTampilan>,
     search: String,
     setSearch: (String) -> Unit,
-    add: (ProductEntity) -> Unit,
+    fileBytes: Map<String, ByteArray>,
+    failedFileIds: Set<String>,
+    loadFile: (String) -> Unit,
+    add: (BarangEntity) -> Unit,
     cart: () -> Unit,
     history: () -> Unit,
     avatar: () -> Unit,
-    modifier: Modifier = Modifier,
-    cartItems: List<CartLineData> = emptyList(),
-    onChangeQty: ((String, Int) -> Unit)? = null
+    cartItems: List<BarisKeranjang> = emptyList(),
+    onChangeQty: ((String, Int) -> Unit)? = null,
 ) {
     var category by rememberSaveable { mutableStateOf("Semua") }
     val view = LocalView.current
@@ -83,7 +94,7 @@ internal fun CashierScreen(
 
     val activeQuantities: Map<String, Int> = remember(cartItems, onChangeQty, fallbackQuantities.toMap()) {
         if (onChangeQty != null) {
-            cartItems.associate { it.productId to it.quantity }
+            cartItems.associate { it.barangId to it.jumlah }
         } else {
             fallbackQuantities.toMap()
         }
@@ -99,9 +110,9 @@ internal fun CashierScreen(
         }
     }
 
-    fun applyQuantityChange(product: ProductEntity, newQty: Int, showBanner: Boolean) {
-        val clamped = newQty.coerceIn(0, product.stock)
-        val oldQty = activeQuantities[product.id] ?: 0
+    fun applyQuantityChange(barang: BarangEntity, newQty: Int, showBanner: Boolean) {
+        val clamped = newQty.coerceIn(0, barang.stokSaatIni)
+        val oldQty = activeQuantities[barang.id] ?: 0
         val delta = clamped - oldQty
         if (delta == 0) return
 
@@ -109,125 +120,156 @@ internal fun CashierScreen(
 
         if (onChangeQty != null) {
             if (oldQty == 0 && clamped > 0) {
-                // Item belum ada di keranjang -> buat entry baru via addToCart dulu
-                add(product)
+                add(barang)
                 if (clamped > 1) {
-                    onChangeQty(product.id, clamped - 1)
+                    onChangeQty(barang.id, clamped - 1)
                 }
             } else {
-                // Item sudah ada di keranjang -> kirim selisih (+ atau -) lewat changeCart
-                onChangeQty(product.id, delta)
+                onChangeQty(barang.id, delta)
             }
         } else {
-            if (clamped == 0) fallbackQuantities.remove(product.id)
-            else fallbackQuantities[product.id] = clamped
-            if (delta > 0) repeat(delta) { add(product) }
+            if (clamped == 0) fallbackQuantities.remove(barang.id)
+            else fallbackQuantities[barang.id] = clamped
+            if (delta > 0) repeat(delta) { add(barang) }
         }
 
         if (showBanner && delta > 0) {
-            announcementText = "Barang berhasil ditambahkan (${product.name} • ${clamped}x)"
+            announcementText = "Barang berhasil ditambahkan (${barang.nama} • ${clamped}x)"
             announcementTick++
         }
     }
 
-    Box(modifier = modifier.fillMaxSize()) {
+    val categories = items.flatMap { it.kategori }.distinct().sorted()
+    val visible = items.filter { item ->
+        val barang = item.barang
+        (barang.nama.contains(search, true) || barang.sku.orEmpty().contains(search, true)) &&
+                (category == "Semua" || category in item.kategori)
+    }
+
+    Box(modifier = modifier.fillMaxSize().background(Bg)) {
         Column(modifier = Modifier.fillMaxSize()) {
-            Page(modifier = Modifier.weight(1f)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(Modifier.weight(1f)) {
-                        Heading(
-                            stringResource(R.string.screen_copy_099),
-                            "Pilih barang untuk transaksi"
-                        )
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(2),
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(horizontal = 16.dp),
+                contentPadding = PaddingValues(bottom = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                item(span = { GridItemSpan(maxLineSpan) }) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Column {
+                            Text(stringResource(R.string.kasir_catalog_title), fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                            Text(stringResource(R.string.kasir_catalog_subtitle), color = Muted, fontSize = 12.sp)
+                        }
+                        TextButton(onClick = avatar) { Text(stringResource(R.string.screen_copy_100), color = Red) }
                     }
-                    Text(
-                        stringResource(R.string.screen_copy_100),
-                        Modifier
-                            .clickable { avatar() }
-                            .padding(8.dp),
-                        fontSize = 23.sp,
-                        color = Purple
+                }
+                item(span = { GridItemSpan(maxLineSpan) }) {
+                    OutlinedTextField(
+                        value = search,
+                        onValueChange = setSearch,
+                        modifier = Modifier.fillMaxWidth(),
+                        placeholder = { Text(stringResource(R.string.katalog_search)) },
+                        singleLine = true,
                     )
                 }
-
-                OutlinedTextField(
-                    value = search,
-                    onValueChange = setSearch,
-                    modifier = Modifier.fillMaxWidth(),
-                    placeholder = { Text(stringResource(R.string.screen_copy_067)) },
-                    singleLine = true
-                )
-
-                Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                    listOf("Semua", "Makanan", "Sembako", "Minuman").forEach {
-                        FilterChip(
-                            selected = category == it,
-                            onClick = { category = it },
-                            label = { Text(it, fontSize = 10.sp) }
-                        )
+                item(span = { GridItemSpan(maxLineSpan) }) {
+                    Row(
+                        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        (listOf("Semua") + categories).forEach { value ->
+                            FilterChip(
+                                selected = category == value,
+                                onClick = { category = value },
+                                label = { Text(value) },
+                            )
+                        }
                     }
                 }
-
-                items
-                    .filter {
-                        (it.name.contains(search, true) || it.sku.contains(search, true)) &&
-                                (category == "Semua" || it.categories.split(",")
-                                    .any { c -> c.trim().equals(category, true) })
+                if (visible.isEmpty()) {
+                    item(span = { GridItemSpan(maxLineSpan) }) {
+                        Text(
+                            stringResource(R.string.kasir_catalog_empty),
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 30.dp),
+                            color = Muted,
+                        )
                     }
-                    .forEach { product ->
-                        val currentQty = activeQuantities[product.id] ?: 0
-                        val remainingStock = (product.stock - currentQty).coerceAtLeast(0)
+                } else {
+                    items(visible, key = { it.barang.id }) { item ->
+                        val barang = item.barang
+                        val currentQty = activeQuantities[barang.id] ?: 0
+                        val remainingStock = (barang.stokSaatIni - currentQty).coerceAtLeast(0)
+                        val habis = item.statusStok == StatusStok.HABIS || barang.stokSaatIni <= 0
 
-                        Row(
+                        Column(
                             Modifier
                                 .fillMaxWidth()
-                                .padding(vertical = 5.dp)
                                 .clip(RoundedCornerShape(16.dp))
-                                .background(Color.White)
-                                .padding(12.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                                .background(if (habis) Soft else Color.White)
+                                .border(1.dp, Color(0xFFE5E7EB), RoundedCornerShape(16.dp))
+                                .clickable(enabled = !habis && currentQty == 0) {
+                                    applyQuantityChange(barang, 1, showBanner = true)
+                                }
+                                .padding(10.dp),
+                            verticalArrangement = Arrangement.spacedBy(5.dp),
                         ) {
-                            Column(Modifier.weight(1f)) {
-                                Text(
-                                    product.name,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                Text(
-                                    "${product.sku} • Stok $remainingStock",
-                                    fontSize = 10.sp,
-                                    color = if (remainingStock > 0) Muted else Red
-                                )
-                                Text(
-                                    money(product.sellPrice),
-                                    color = Red,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
+                            ServerFileImage(
+                                fileId = barang.fotoFileId,
+                                bytes = barang.fotoFileId?.let(fileBytes::get),
+                                gagalDimuat = barang.fotoFileId?.let(failedFileIds::contains) == true,
+                                onLoad = loadFile,
+                                modifier = Modifier.fillMaxWidth().size(92.dp).clip(RoundedCornerShape(12.dp)),
+                                contentDescription = barang.nama,
+                            )
+                            Text(barang.nama, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                            Text(item.kategori.joinToString(" • ").ifBlank { barang.satuan }, color = Muted, fontSize = 10.sp)
+                            Text(RupiahFormatter.format(barang.hargaJual), color = Red, fontWeight = FontWeight.Bold)
+                            Text(
+                                if (habis) stringResource(R.string.katalog_status_empty)
+                                else stringResource(R.string.kasir_stock_count, remainingStock, barang.satuan),
+                                color = if (remainingStock > 0 && !habis) Muted else Red,
+                                fontSize = 11.sp,
+                            )
 
                             if (currentQty == 0) {
                                 Button(
-                                    onClick = { applyQuantityChange(product, 1, showBanner = true) },
-                                    enabled = product.stock > 0,
-                                    colors = ButtonDefaults.buttonColors(containerColor = Red)
+                                    onClick = { applyQuantityChange(barang, 1, showBanner = true) },
+                                    enabled = !habis,
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = ButtonDefaults.buttonColors(containerColor = Red),
                                 ) {
-                                    Text(stringResource(R.string.screen_copy_095))
+                                    Text(if (habis) stringResource(R.string.katalog_status_empty) else stringResource(R.string.screen_copy_095))
                                 }
                             } else {
-                                QuantityStepper(
-                                    quantity = currentQty,
-                                    maxStock = product.stock,
-                                    onQuantityChange = { updated: Int ->
-                                        applyQuantityChange(
-                                            product = product,
-                                            newQty = updated,
-                                            showBanner = updated > currentQty
-                                        )
-                                    }
-                                )
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 4.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    QuantityStepper(
+                                        quantity = currentQty,
+                                        maxStock = barang.stokSaatIni,
+                                        onQuantityChange = { updated ->
+                                            applyQuantityChange(
+                                                barang = barang,
+                                                newQty = updated,
+                                                showBanner = updated > currentQty
+                                            )
+                                        }
+                                    )
+                                }
                             }
                         }
                     }
+                }
             }
 
             Column(
@@ -240,10 +282,18 @@ internal fun CashierScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp, vertical = 10.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    Primary(stringResource(R.string.screen_copy_101), cart)
-                    Secondary(stringResource(R.string.screen_copy_102), history)
+                    Button(
+                        onClick = cart,
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = Red),
+                    ) {
+                        Text(stringResource(R.string.screen_copy_101))
+                    }
+                    TextButton(onClick = history, modifier = Modifier.fillMaxWidth()) {
+                        Text(stringResource(R.string.screen_copy_102))
+                    }
                 }
             }
         }
@@ -254,7 +304,7 @@ internal fun CashierScreen(
             exit = fadeOut() + slideOutVertically { it },
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .padding(start = 16.dp, end = 16.dp, bottom = 120.dp)
+                .padding(start = 16.dp, end = 16.dp, bottom = 116.dp)
         ) {
             Box(
                 modifier = Modifier

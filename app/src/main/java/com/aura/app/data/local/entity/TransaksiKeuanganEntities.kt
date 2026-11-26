@@ -61,8 +61,8 @@ data class PergerakanStokEntity(
     val stokSebelum: Int,
     val stokSesudah: Int,
     val alasan: AlasanPenyesuaian? = null,
-    val akunId: String,
-    val namaAkun: String,
+    val akunId: String?,
+    val namaAkun: String?,
     val referensiId: String? = null,
     val jenisReferensi: String? = null,
     val catatan: String? = null,
@@ -87,6 +87,10 @@ data class PengeluaranEntity(
     val alasanBatal: String? = null,
     val catatan: String? = null,
     val dibuatPada: Long,
+    val barangId: String? = null,
+    val jumlah: Int? = null,
+    val hargaPerItem: Long? = null,
+    val dibuatOleh: String? = null,
 )
 
 @Entity(
@@ -104,6 +108,23 @@ data class PemasukanKustomEntity(
     val alasanBatal: String? = null,
     val catatan: String? = null,
     val dibuatPada: Long,
+)
+
+@Entity(
+    tableName = "pemasukan_penjualan_cache",
+    indices = [Index("idToko"), Index("tanggal")],
+)
+data class PemasukanPenjualanCacheEntity(
+    @PrimaryKey val id: String,
+    val idToko: String,
+    val nomorTransaksi: String,
+    val namaAkun: String?,
+    val metodePembayaran: MetodePembayaran,
+    val nominal: Long,
+    val tanggal: Long,
+    val status: StatusTransaksi,
+    val alasanBatal: String? = null,
+    val catatan: String? = null,
 )
 
 @Entity(

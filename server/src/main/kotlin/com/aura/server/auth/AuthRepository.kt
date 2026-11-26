@@ -1,10 +1,13 @@
 package com.aura.server.auth
 
 import com.aura.server.db.AkunTable
+import com.aura.server.db.FileTable
 import com.aura.server.db.LogAktivitasTable
 import com.aura.server.db.PercobaanLoginTable
 import com.aura.server.db.SesiTable
 import com.aura.server.db.TokoTable
+import com.aura.server.plugins.ApiException
+import io.ktor.http.HttpStatusCode
 import org.jetbrains.exposed.v1.core.ResultRow
 import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq
@@ -222,22 +225,38 @@ internal class ExposedAuthRepository : AuthRepository {
     }
 
     override fun updateStore(account: Akun, name: String?, businessType: String?, address: String?, logoId: UUID?): TokoRingkas = transaction {
-        TokoTable.update({ TokoTable.idToko eq account.idToko }) {
+        if (logoId != null) {
+            val fileExists = FileTable.selectAll().where {
+                (FileTable.idToko eq account.idToko) and (FileTable.id eq logoId.toKotlinUuid())
+            }.singleOrNull() != null
+            if (!fileExists) {
+                throw ApiException(HttpStatusCode.NotFound, "FILE_TIDAK_DITEMUKAN", "File logo tidak ditemukan.")
+            }
+        }
+        val updated = TokoTable.update({ TokoTable.idToko eq account.idToko }) {
             if (name != null) it[TokoTable.nama] = name
             if (businessType != null) it[TokoTable.jenisUsaha] = businessType
             if (address != null) it[TokoTable.alamat] = address
             if (logoId != null) it[TokoTable.logoFileId] = logoId.toKotlinUuid()
         }
+        if (updated != 1) throw ApiException(HttpStatusCode.NotFound, "TOKO_TIDAK_DITEMUKAN", "Toko tidak ditemukan.")
         log(account.idToko, account.id, account.nama, "AKUN", "TOKO_DIUBAH", System.currentTimeMillis())
         findStore(account.idToko)!!
     }
 
     override fun updateOpeningBalance(account: Akun, newBalance: Long): TokoRingkas = transaction {
-        val current = TokoTable.selectAll().where { TokoTable.idToko eq account.idToko }.single()
-        val difference = newBalance - current[TokoTable.saldoAwal]
+        val current = lockStore(account.idToko)
+        val newCumulativeBalance = try {
+            Math.addExact(
+                current[TokoTable.saldoKumulatif],
+                Math.subtractExact(newBalance, current[TokoTable.saldoAwal]),
+            )
+        } catch (_: ArithmeticException) {
+            throw ApiException(HttpStatusCode.BadRequest, "SALDO_TIDAK_VALID", "Perubahan saldo melebihi batas yang didukung.")
+        }
         TokoTable.update({ TokoTable.idToko eq account.idToko }) {
             it[saldoAwal] = newBalance
-            it[saldoKumulatif] = current[TokoTable.saldoKumulatif] + difference
+            it[saldoKumulatif] = newCumulativeBalance
         }
         log(account.idToko, account.id, account.nama, "KEUANGAN", "SALDO_AWAL_DIUBAH", System.currentTimeMillis())
         findStore(account.idToko)!!
@@ -362,6 +381,20 @@ internal class ExposedAuthRepository : AuthRepository {
         val accountIds = AkunTable.selectAll().where { AkunTable.idToko eq storeId }.map { it[AkunTable.id] }
         val now = System.currentTimeMillis()
         accountIds.forEach { id -> SesiTable.update({ (SesiTable.akunId eq id) and SesiTable.dicabutPada.isNull() }) { it[dicabutPada] = now } }
+    }
+
+    private fun lockStore(storeId: String): org.jetbrains.exposed.v1.core.ResultRow {
+        while (true) {
+            val row = TokoTable.selectAll().where { TokoTable.idToko eq storeId }.singleOrNull()
+                ?: throw ApiException(HttpStatusCode.NotFound, "TOKO_TIDAK_DITEMUKAN", "Toko tidak ditemukan.")
+            val balance = row[TokoTable.saldoKumulatif]
+            val locked = TokoTable.update({
+                (TokoTable.idToko eq storeId) and (TokoTable.saldoKumulatif eq balance)
+            }) {
+                it[saldoKumulatif] = balance
+            }
+            if (locked == 1) return row
+        }
     }
 
     private fun log(storeId: String, accountId: UUID?, name: String, category: String, action: String, at: Long) {

@@ -39,7 +39,7 @@ import java.util.Locale
                 Text(stringResource(R.string.screen_copy_110),fontSize=44.sp,color=Green,fontWeight=FontWeight.Bold)
             }
             Text(stringResource(R.string.screen_copy_111),fontSize=22.sp,fontWeight=FontWeight.ExtraBold)
-            Text(stringResource(R.string.screen_copy_112),fontSize=11.sp,color=Muted)
+            Text(stringResource(R.string.kasir_success_server_saved),fontSize=11.sp,color=Muted)
         }
         Panel {
             Text(stringResource(R.string.screen_copy_113),fontWeight=FontWeight.Bold)

@@ -28,6 +28,9 @@ interface BarangDao {
     @Upsert
     suspend fun upsert(barang: BarangEntity)
 
+    @Query("DELETE FROM barang WHERE id = :id")
+    suspend fun clearBarang(id: String)
+
     @Upsert
     suspend fun upsertAll(daftar: List<BarangEntity>)
 
@@ -52,8 +55,20 @@ interface BarangDao {
     @Upsert
     suspend fun upsertRelasiKategori(relasi: List<BarangKategoriCrossRef>)
 
+    @Query("SELECT * FROM barang_kategori")
+    fun observeRelasiKategori(): Flow<List<BarangKategoriCrossRef>>
+
     @Query("DELETE FROM barang_kategori WHERE barangId = :barangId")
     suspend fun clearRelasiBarang(barangId: String)
+
+    @Query("DELETE FROM barang_kategori WHERE kategoriId = :kategoriId")
+    suspend fun clearRelasiKategori(kategoriId: String)
+
+    @Query("DELETE FROM kategori WHERE id = :kategoriId")
+    suspend fun deleteKategori(kategoriId: String)
+
+    @Query("DELETE FROM barang_kategori WHERE barangId IN (SELECT id FROM barang WHERE idToko = :idToko)")
+    suspend fun clearRelasiKategoriByToko(idToko: String)
 
     @Query("SELECT * FROM harga_beli_supplier WHERE barangId = :barangId ORDER BY terakhirDiperbarui DESC")
     fun observeHargaBeliSupplier(barangId: String): Flow<List<HargaBeliSupplierEntity>>
@@ -75,6 +90,9 @@ interface SupplierDao {
 
     @Upsert
     suspend fun upsert(supplier: SupplierEntity)
+
+    @Query("DELETE FROM supplier WHERE id = :id")
+    suspend fun delete(id: String)
 
     @Upsert
     suspend fun upsertAll(daftar: List<SupplierEntity>)
