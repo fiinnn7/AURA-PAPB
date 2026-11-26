@@ -60,6 +60,7 @@ import com.aura.app.core.model.Peran
 import com.aura.app.data.network.KoneksiChecker
 import com.aura.app.data.remote.GlobalSessionHandler
 import com.aura.app.data.repository.AkunRepository
+import com.aura.app.data.repository.AnalisisRepository
 import com.aura.app.data.repository.BarangRepository
 import com.aura.app.data.repository.AuthRepository
 import com.aura.app.data.repository.KeuanganRepository
@@ -85,7 +86,13 @@ import com.aura.app.ui.components.LogoutConfirmationDialog
 import com.aura.app.ui.profile.EditProfilEvent
 import com.aura.app.ui.profile.ManajemenKasirViewModel
 import com.aura.app.ui.profile.ProfilViewModel
+import com.aura.app.ui.analisis.AnalisisViewModel
 import com.aura.app.ui.screens.analisis.AnalysisScreen
+import com.aura.app.ui.screens.analisis.CorrelationScreen
+import com.aura.app.ui.screens.analisis.MovementListScreen
+import com.aura.app.ui.screens.analisis.ProportionListScreen
+import com.aura.app.ui.screens.analisis.StockRunwayScreen
+import com.aura.app.ui.screens.analisis.TrendListScreen
 import com.aura.app.ui.screens.auth.LoginScreen
 import com.aura.app.ui.screens.auth.RegisterOneScreen
 import com.aura.app.ui.screens.auth.RegisterTwoScreen
@@ -128,7 +135,10 @@ import com.aura.app.ui.theme.Soft
 import kotlinx.coroutines.launch
 
 private val ownerRoutes = setOf(
-    Routes.DASHBOARD, Routes.MENU_MANAJEMEN, Routes.ANALISIS, Routes.PROFIL, Routes.NOTIFIKASI,
+    Routes.DASHBOARD, Routes.MENU_MANAJEMEN, Routes.ANALISIS,
+    Routes.ANALISIS_PERGERAKAN, Routes.ANALISIS_UMUR_STOK, Routes.ANALISIS_PROPORSI,
+    Routes.ANALISIS_TREN, Routes.ANALISIS_KORELASI,
+    Routes.PROFIL, Routes.NOTIFIKASI,
     Routes.PENGELUARAN, Routes.DETAIL_PENGELUARAN, Routes.CATAT_PENGELUARAN,
     Routes.PEMASUKAN, Routes.DETAIL_PEMASUKAN, Routes.CATAT_PEMASUKAN,
     Routes.MANAJEMEN_BARANG, Routes.PROFIL_BARANG, Routes.TAMBAH_BARANG, Routes.CATAT_RESTOCK,
@@ -163,6 +173,11 @@ private fun RouteNavHost(
             composable(Routes.DASHBOARD) { content(Routes.DASHBOARD, it) }
             composable(Routes.MENU_MANAJEMEN) { content(Routes.MENU_MANAJEMEN, it) }
             composable(Routes.ANALISIS) { content(Routes.ANALISIS, it) }
+            composable(Routes.ANALISIS_PERGERAKAN) { content(Routes.ANALISIS_PERGERAKAN, it) }
+            composable(Routes.ANALISIS_UMUR_STOK) { content(Routes.ANALISIS_UMUR_STOK, it) }
+            composable(Routes.ANALISIS_PROPORSI) { content(Routes.ANALISIS_PROPORSI, it) }
+            composable(Routes.ANALISIS_TREN) { content(Routes.ANALISIS_TREN, it) }
+            composable(Routes.ANALISIS_KORELASI) { content(Routes.ANALISIS_KORELASI, it) }
             composable(Routes.PROFIL) { content(Routes.PROFIL, it) }
         }
         navigation(startDestination = Routes.MANAJEMEN_BARANG, route = "barang_tab_graph") {
@@ -214,6 +229,7 @@ fun AuraNavHost(
     barangRepository: BarangRepository,
     penjualanRepository: PenjualanRepository,
     keuanganRepository: KeuanganRepository,
+    analisisRepository: AnalisisRepository,
     globalSessionHandler: GlobalSessionHandler,
     koneksiChecker: KoneksiChecker,
     vm: AuraViewModel = viewModel(),
@@ -234,6 +250,10 @@ fun AuraNavHost(
         factory = KeuanganViewModel.factory(keuanganRepository, barangRepository),
     )
     val keuanganState by keuanganVm.uiState.collectAsStateWithLifecycle()
+    val analisisVm: AnalisisViewModel = viewModel(
+        factory = AnalisisViewModel.factory(analisisRepository),
+    )
+    val analisisState by analisisVm.uiState.collectAsStateWithLifecycle()
 
     val products by vm.products.collectAsStateWithLifecycle()
     val suppliers by vm.suppliers.collectAsStateWithLifecycle()
@@ -255,7 +275,7 @@ fun AuraNavHost(
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
 
-    var selectedProductId by rememberSaveable { mutableStateOf("BRG-001") }
+    var selectedProductId by rememberSaveable { mutableStateOf("") }
     var editProductId by rememberSaveable { mutableStateOf<String?>(null) }
     var selectedSupplierId by rememberSaveable { mutableStateOf("") }
     var showAvatar by remember { mutableStateOf(false) }
@@ -267,7 +287,9 @@ fun AuraNavHost(
     var selectedExpenseId by rememberSaveable { mutableStateOf("") }
     var selectedIncomeId by rememberSaveable { mutableStateOf("") }
     var hideBalance by rememberSaveable { mutableStateOf(true) }
-    var analysisTab by rememberSaveable { mutableStateOf("Ringkasan") }
+    var analisisMovementJenis by rememberSaveable { mutableStateOf("fast") }
+    var analisisProporsiJenis by rememberSaveable { mutableStateOf("profit") }
+    var analisisTrenArah by rememberSaveable { mutableStateOf("naik") }
     var search by rememberSaveable { mutableStateOf("") }
 
     val idTokoDisalinMsg = stringResource(R.string.profil_id_toko_disalin)
@@ -325,6 +347,7 @@ fun AuraNavHost(
     LaunchedEffect(sesiAktif?.akunId, sesiAktif?.idToko) {
         kasirVm.sambungkanSesi(sesiAktif)
         keuanganVm.sambungkanSesi(sesiAktif)
+        analisisVm.sambungkanSesi(sesiAktif?.idToko)
     }
 
     LaunchedEffect(route, sesiAktif?.idToko) {
@@ -660,8 +683,77 @@ fun AuraNavHost(
                     }
 
                     Routes.DASHBOARD -> DashboardScreen(keuanganState.toko, products, transactions, cashRecords, hideBalance, { hideBalance = !hideBalance }, { go(it) })
-                    Routes.MENU_MANAJEMEN -> ManagementScreen(go = { go(it) })
-                    Routes.ANALISIS -> AnalysisScreen(analysisTab, { analysisTab = it }, products, transactions, transactionItems, cashRecords, adjustments, restocks, movements)
+                    Routes.MENU_MANAJEMEN -> ManagementScreen(go = {
+                        if (it == Routes.PERGERAKAN_STOK) selectedProductId = ""
+                        go(it)
+                    })
+                    Routes.ANALISIS -> AnalysisScreen(
+                        uiState = analisisState,
+                        onSelectPeriode = { analisisVm.setPeriode(it) },
+                        onRefresh = { analisisVm.muatOverview(refreshing = true) },
+                        onToggleProporsi = analisisVm::setProporsiTab,
+                        onOpenMovement = { jenis ->
+                            analisisMovementJenis = jenis
+                            go(Routes.ANALISIS_PERGERAKAN)
+                        },
+                        onOpenRunway = { go(Routes.ANALISIS_UMUR_STOK) },
+                        onOpenProportion = { jenis ->
+                            analisisProporsiJenis = jenis
+                            go(Routes.ANALISIS_PROPORSI)
+                        },
+                        onOpenTrend = { arah ->
+                            analisisTrenArah = arah
+                            go(Routes.ANALISIS_TREN)
+                        },
+                        onOpenCorrelation = { go(Routes.ANALISIS_KORELASI) },
+                    )
+                    Routes.ANALISIS_PERGERAKAN -> MovementListScreen(
+                        jenis = analisisMovementJenis,
+                        uiState = analisisState,
+                        onSelectPeriode = { p -> analisisVm.setPeriode(p) { analisisVm.muatPergerakan(analisisMovementJenis) } },
+                        onSortChange = analisisVm::setMovementSort,
+                        onLoad = { analisisVm.muatPergerakan(analisisMovementJenis) },
+                        onOpenProduct = { productId ->
+                            selectedProductId = productId
+                            go(Routes.PROFIL_BARANG)
+                        },
+                    )
+                    Routes.ANALISIS_UMUR_STOK -> StockRunwayScreen(
+                        uiState = analisisState,
+                        onSelectPeriode = { p -> analisisVm.setPeriode(p) { analisisVm.muatUmurStok() } },
+                        onLoad = { analisisVm.muatUmurStok() },
+                        onOpenProduct = { productId ->
+                            selectedProductId = productId
+                            go(Routes.PROFIL_BARANG)
+                        },
+                    )
+                    Routes.ANALISIS_PROPORSI -> ProportionListScreen(
+                        jenis = analisisProporsiJenis,
+                        uiState = analisisState,
+                        onSelectPeriode = { p -> analisisVm.setPeriode(p) { analisisVm.muatProporsi(analisisProporsiJenis) } },
+                        onLoad = { analisisVm.muatProporsi(analisisProporsiJenis) },
+                        onOpenProduct = { productId ->
+                            selectedProductId = productId
+                            go(Routes.PROFIL_BARANG)
+                        },
+                    )
+                    Routes.ANALISIS_TREN -> TrendListScreen(
+                        arah = analisisTrenArah,
+                        uiState = analisisState,
+                        onSelectPeriode = { p -> analisisVm.setPeriode(p) { analisisVm.muatTren(analisisTrenArah) } },
+                        onSwitchArah = { arah -> analisisTrenArah = arah },
+                        onLoad = { analisisVm.muatTren(analisisTrenArah) },
+                        onOpenProduct = { productId ->
+                            selectedProductId = productId
+                            go(Routes.PROFIL_BARANG)
+                        },
+                    )
+                    Routes.ANALISIS_KORELASI -> CorrelationScreen(
+                        uiState = analisisState,
+                        onSelectPeriode = { p -> analisisVm.setPeriode(p) { analisisVm.muatKorelasi() } },
+                        onToggleProduct = analisisVm::toggleCorrelation,
+                        onLoad = { analisisVm.muatKorelasi() },
+                    )
                     Routes.NOTIFIKASI -> NotificationScreen(notifications, { vm.readNotification(it) }, { vm.readAllNotifications() }, { go(it) })
                     Routes.PENGELUARAN -> ExpenseListScreen(
                         uiState = keuanganState,
@@ -1271,6 +1363,11 @@ private fun routeTitle(route: String) = mapOf(
     Routes.DASHBOARD to "Dashboard",
     Routes.MENU_MANAJEMEN to "Menu Manajemen",
     Routes.ANALISIS to "Analisis Bisnis",
+    Routes.ANALISIS_PERGERAKAN to "Pergerakan Barang",
+    Routes.ANALISIS_UMUR_STOK to "Estimasi Umur Stok",
+    Routes.ANALISIS_PROPORSI to "Proporsi Penjualan",
+    Routes.ANALISIS_TREN to "Tren Penjualan",
+    Routes.ANALISIS_KORELASI to "Korelasi Antar Produk",
     Routes.PROFIL to "Profil",
     Routes.EDIT_PROFIL to "Edit Profil",
     Routes.UBAH_KATA_SANDI to "Ubah Kata Sandi",

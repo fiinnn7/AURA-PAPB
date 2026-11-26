@@ -14,6 +14,7 @@ import com.aura.app.data.remote.datasource.KeuanganRemoteDataSource
 import com.aura.app.data.remote.datasource.KatalogRemoteDataSource
 import com.aura.app.data.remote.datasource.PenjualanRemoteDataSource
 import com.aura.app.data.repository.AkunRepository
+import com.aura.app.data.repository.AnalisisRepository
 import com.aura.app.data.repository.AuthRepository
 import com.aura.app.data.repository.BarangRepository
 import com.aura.app.data.repository.DefaultPenjualanRepository
@@ -60,6 +61,13 @@ fun AuraApp(vm: AuraViewModel = viewModel()) {
         )
     }
     val keuanganRemoteDataSource = remember { KeuanganRemoteDataSource(keuanganApiService) }
+    val analisisApiService = remember {
+        RetrofitClient.createAnalisisApiService(
+            tokenProvider = { sesiRepository.tokenTersimpanSinkron() },
+            onUnauthorized = { globalSessionHandler.onUnauthorized() },
+        )
+    }
+    val analisisRepository = remember { AnalisisRepository(analisisApiService) }
     val authRepository: AuthRepository = remember {
         DefaultAuthRepository(appDatabase, authRemoteDataSource, sesiRepository, koneksiChecker)
     }
@@ -90,6 +98,7 @@ fun AuraApp(vm: AuraViewModel = viewModel()) {
         barangRepository = barangRepository,
         penjualanRepository = penjualanRepository,
         keuanganRepository = keuanganRepository,
+        analisisRepository = analisisRepository,
         globalSessionHandler = globalSessionHandler,
         koneksiChecker = koneksiChecker,
         vm = vm,

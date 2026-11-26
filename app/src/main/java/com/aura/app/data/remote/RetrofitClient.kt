@@ -1,6 +1,7 @@
 package com.aura.app.data.remote
 
 import com.aura.app.BuildConfig
+import com.aura.app.data.remote.api.AnalisisApiService
 import com.aura.app.data.remote.api.AuthApiService
 import com.aura.app.data.remote.api.KeuanganApiService
 import com.aura.app.data.remote.api.KatalogApiService
@@ -62,4 +63,11 @@ object RetrofitClient {
         onUnauthorized: () -> Unit,
     ): PenjualanApiService = createRetrofit(baseUrl, tokenProvider, onUnauthorized)
         .create(PenjualanApiService::class.java)
+
+    fun createAnalisisApiService(
+        baseUrl: String = BuildConfig.BASE_URL,
+        tokenProvider: () -> String?,
+        onUnauthorized: () -> Unit,
+    ): AnalisisApiService = createRetrofit(baseUrl, tokenProvider, onUnauthorized)
+        .create(AnalisisApiService::class.java)
 }

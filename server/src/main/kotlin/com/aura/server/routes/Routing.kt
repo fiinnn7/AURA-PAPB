@@ -1,5 +1,6 @@
 package com.aura.server.routes
 
+import com.aura.server.analysis.AnalysisComponents
 import com.aura.server.auth.AuthComponents
 import com.aura.server.catalog.CatalogComponents
 import com.aura.server.stock.StockComponents
@@ -17,10 +18,11 @@ internal data class HealthResponse(val status: String)
 internal fun Application.configureRouting(
     auth: AuthComponents? = null,
     catalog: CatalogComponents? = null,
-    additionalRoutes: Routing.() -> Unit = {},
     stock: StockComponents? = null,
     sales: SalesComponents? = null,
     finance: FinanceComponents? = null,
+    analysis: AnalysisComponents? = null,
+    additionalRoutes: Routing.() -> Unit = {},
 ) {
     routing {
         get("/health") {
@@ -31,6 +33,7 @@ internal fun Application.configureRouting(
         if (auth != null && stock != null) stockRoutes(auth, stock)
         if (auth != null && sales != null) salesRoutes(auth, sales)
         if (auth != null && finance != null) financeRoutes(auth, finance)
+        if (auth != null && analysis != null) analysisRoutes(auth, analysis)
         additionalRoutes()
     }
 }

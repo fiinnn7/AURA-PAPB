@@ -1,5 +1,7 @@
 package com.aura.server
 
+import com.aura.server.analysis.AnalysisComponents
+import com.aura.server.analysis.analysisComponents
 import com.aura.server.config.AppConfig
 import com.aura.server.db.DatabaseFactory
 import com.aura.server.auth.authComponents
@@ -34,6 +36,7 @@ fun Application.module() {
     val stock = stockComponents(catalog.service)
     val sales = salesComponents()
     val finance = financeComponents()
+    val analysis = analysisComponents()
     val deletionWorker = Executors.newSingleThreadScheduledExecutor { task ->
         Thread(task, "aura-owner-deletion-worker").apply { isDaemon = true }
     }
@@ -47,21 +50,22 @@ fun Application.module() {
         deletionWorker.shutdownNow()
         dataSource.close()
     }
-    configureHttp(auth, catalog = catalog, stock = stock, sales = sales, finance = finance)
+    configureHttp(auth, catalog = catalog, stock = stock, sales = sales, finance = finance, analysis = analysis)
 }
 
 internal fun Application.configureHttp(
     auth: com.aura.server.auth.AuthComponents? = null,
     catalog: com.aura.server.catalog.CatalogComponents? = null,
-    additionalRoutes: Routing.() -> Unit = {},
     stock: com.aura.server.stock.StockComponents? = null,
     sales: com.aura.server.sales.SalesComponents? = null,
     finance: com.aura.server.finance.FinanceComponents? = null,
+    analysis: AnalysisComponents? = null,
+    additionalRoutes: Routing.() -> Unit = {},
 ) {
     configureSerialization()
     configureStatusPages()
     auth?.let(::configureAuthentication)
     configureLogging()
     configureDefaultHeaders()
-    configureRouting(auth, catalog, additionalRoutes, stock, sales, finance)
+    configureRouting(auth, catalog, stock, sales, finance, analysis, additionalRoutes)
 }

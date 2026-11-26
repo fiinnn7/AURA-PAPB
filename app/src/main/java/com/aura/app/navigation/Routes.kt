@@ -12,6 +12,11 @@ object Routes {
     const val DASHBOARD = "dashboard"
     const val MENU_MANAJEMEN = "menu_manajemen"
     const val ANALISIS = "analisis"
+    const val ANALISIS_PERGERAKAN = "analisis_pergerakan"
+    const val ANALISIS_UMUR_STOK = "analisis_umur_stok"
+    const val ANALISIS_PROPORSI = "analisis_proporsi"
+    const val ANALISIS_TREN = "analisis_tren"
+    const val ANALISIS_KORELASI = "analisis_korelasi"
     const val PROFIL = "profil"
     const val NOTIFIKASI = "notifikasi"
     const val PENGELUARAN = "pengeluaran"
@@ -44,7 +49,9 @@ object Routes {
 
     val all: List<String> = listOf(
         WELCOME, LOGIN, REGISTER_STEP1, REGISTER_STEP2, UBAH_KATA_SANDI, UBAH_KATA_SANDI_WAJIB,
-        EDIT_PROFIL, DASHBOARD, MENU_MANAJEMEN, ANALISIS, PROFIL,
+        EDIT_PROFIL, DASHBOARD, MENU_MANAJEMEN, ANALISIS,
+        ANALISIS_PERGERAKAN, ANALISIS_UMUR_STOK, ANALISIS_PROPORSI, ANALISIS_TREN, ANALISIS_KORELASI,
+        PROFIL,
         NOTIFIKASI, PENGELUARAN, DETAIL_PENGELUARAN, CATAT_PENGELUARAN, PEMASUKAN,
         DETAIL_PEMASUKAN, CATAT_PEMASUKAN, MANAJEMEN_BARANG,
         PROFIL_BARANG, TAMBAH_BARANG, CATAT_RESTOCK, PENYESUAIAN_STOK, PERGERAKAN_STOK, SUPPLIER,
