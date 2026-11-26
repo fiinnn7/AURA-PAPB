@@ -221,6 +221,7 @@ internal fun DashboardScreen(
         }
 
         // --- SECTION: AKSES CEPAT (2x3 CARD GRID) ---
+        Spacer(modifier = Modifier.height(16.dp))
         Heading(stringResource(R.string.screen_copy_092))
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             quickAccessItems.chunked(2).forEach { rowItems ->
