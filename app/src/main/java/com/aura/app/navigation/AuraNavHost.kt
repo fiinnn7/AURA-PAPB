@@ -32,9 +32,9 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -50,7 +50,6 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navigation
 import com.aura.app.R
-import com.aura.app.core.access.AksiAkses
 import com.aura.app.core.access.AksesPeran
 import com.aura.app.core.model.Peran
 import com.aura.app.data.network.KoneksiChecker
@@ -190,7 +189,7 @@ fun AuraNavHost(
     koneksiChecker: KoneksiChecker,
     vm: AuraViewModel = viewModel(),
 ) {
-    val context = LocalContext.current
+    val resources = LocalResources.current
     val authSessionVm: AuthSessionViewModel = viewModel(
         factory = AuthSessionViewModel.factory(authRepository, globalSessionHandler, koneksiChecker),
     )
@@ -438,6 +437,7 @@ fun AuraNavHost(
                             factory = RegisterViewModel.factory(authRepository, koneksiChecker),
                         )
                         val regState by registerVm.uiState.collectAsStateWithLifecycle()
+
                         LaunchedEffect(registerVm) {
                             registerVm.refreshKoneksi()
                             registerVm.events.collect { event ->
@@ -445,7 +445,7 @@ fun AuraNavHost(
                                     root(Routes.DASHBOARD)
                                     event.pesanPeringatanProfil?.let { warning ->
                                         showSnackbar(
-                                            context.getString(R.string.auth_register_profile_partial_warning, warning),
+                                            resources.getString(R.string.auth_register_profile_partial_warning, warning),
                                         )
                                     }
                                 }
@@ -597,7 +597,17 @@ fun AuraNavHost(
                     Routes.SUPPLIER -> SupplierScreen(suppliers, { id, name, phone, address, note -> vm.saveSupplier(id, name, phone, address, note) }, { vm.deleteSupplier(it) })
                     Routes.RIWAYAT_AKTIVITAS -> ActivityScreen(activities)
                     Routes.METODE_PEMBAYARAN -> PaymentSettingsScreen(store?.bankInfo ?: "", { vm.updateBankInfo(it) }, { vm.updateQris(it) })
-                    Routes.K1_BERANDA_KASIR -> CashierScreen(products, search, { search = it }, { vm.addToCart(it) }, { go(Routes.K2_CATAT_TRANSAKSI) }, { go(Routes.RIWAYAT_HARI_INI) }, { showAvatar = true })
+                    Routes.K1_BERANDA_KASIR -> CashierScreen(
+                        items = products,
+                        search = search,
+                        setSearch = { search = it },
+                        add = { vm.addToCart(it) },
+                        cart = { go(Routes.K2_CATAT_TRANSAKSI) },
+                        history = { go(Routes.RIWAYAT_HARI_INI) },
+                        avatar = { showAvatar = true },
+                        cartItems = cart,
+                        onChangeQty = { id, delta -> vm.changeCart(id, delta) },
+                    )
                     Routes.K2_CATAT_TRANSAKSI -> CartScreen(
                         cart = cart,
                         change = { id, delta -> vm.changeCart(id, delta) },
