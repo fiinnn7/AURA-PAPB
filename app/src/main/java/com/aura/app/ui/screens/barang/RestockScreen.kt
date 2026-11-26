@@ -27,6 +27,7 @@ import com.aura.app.core.format.RupiahFormatter
 import com.aura.app.core.model.StatusAkun
 import com.aura.app.data.local.entity.SupplierEntity
 import com.aura.app.ui.barang.BarangTampilan
+import com.aura.app.ui.components.AuraRedButton
 import com.aura.app.ui.components.Heading
 import com.aura.app.ui.components.Input
 import com.aura.app.ui.components.Page
@@ -128,7 +129,7 @@ internal fun RestockScreen(
         )
         if (supplierInputFocused || newSupplierName.isNotBlank()) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(
+                AuraRedButton(
                     onClick = {
                         val requestedName = newSupplierName.trim()
                         supplierIdsBeforeCreate = activeSuppliers.map { it.id }.toSet()
@@ -136,7 +137,6 @@ internal fun RestockScreen(
                         createSupplier(requestedName)
                     },
                     enabled = newSupplierName.isNotBlank() && !creatingSupplier,
-                    colors = ButtonDefaults.buttonColors(containerColor = Red),
                 ) {
                     Text(
                         if (creatingSupplier) stringResource(R.string.katalog_saving)

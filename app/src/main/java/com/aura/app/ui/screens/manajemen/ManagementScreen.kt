@@ -34,6 +34,6 @@ import java.util.Locale
 
 @Composable internal fun ManagementScreen(go:(String)->Unit, modifier: Modifier = Modifier) {
     Page(modifier = modifier) { Heading(stringResource(R.string.screen_copy_135),"Kelola seluruh operasional toko")
-        listOf("Buka menu kasir" to "k1_beranda_kasir","Daftar barang, stok" to "manajemen_barang","Riwayat keluar-masuk" to "pergerakan_stok","Daftar pemasok" to "supplier","Pengeluaran" to "pengeluaran","Pemasukan" to "pemasukan","Log audit seluruh aktivitas" to "riwayat_aktivitas","Pengaturan toko" to "pengaturan").forEach{ActionRow(it.first,"Kelola ${it.first.lowercase()}"){go(it.second)}}
+        listOf("Buka menu kasir" to "k1_beranda_kasir","Daftar barang, stok" to "manajemen_barang","Catat restock" to "catat_restock","Riwayat keluar-masuk" to "pergerakan_stok","Daftar pemasok" to "supplier","Pengeluaran" to "pengeluaran","Pemasukan" to "pemasukan","Log audit seluruh aktivitas" to "riwayat_aktivitas","Pengaturan toko" to "pengaturan").forEach{ActionRow(it.first,"Kelola ${it.first.lowercase()}"){go(it.second)}}
     }
 }

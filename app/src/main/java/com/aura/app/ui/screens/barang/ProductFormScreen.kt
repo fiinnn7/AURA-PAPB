@@ -34,6 +34,7 @@ import com.aura.app.data.local.entity.KategoriEntity
 import com.aura.app.data.local.entity.SupplierEntity
 import com.aura.app.data.repository.DataBarang
 import com.aura.app.ui.barang.BarangTampilan
+import com.aura.app.ui.components.AuraRedButton
 import com.aura.app.ui.components.Page
 import com.aura.app.ui.components.ServerFileImage
 import com.aura.app.ui.theme.Red
@@ -106,7 +107,7 @@ internal fun ProductFormScreen(
         OutlinedTextField(name, { name = it }, Modifier.fillMaxWidth(), label = { Text(stringResource(R.string.screen_copy_057)) }, singleLine = true)
         Column {
             Text(stringResource(R.string.screen_copy_059))
-            Button(onClick = { unitMenuOpen = true }, colors = ButtonDefaults.buttonColors(containerColor = Red)) {
+            AuraRedButton(onClick = { unitMenuOpen = true }) {
                 Text(unit)
             }
             DropdownMenu(expanded = unitMenuOpen, onDismissRequest = { unitMenuOpen = false }) {
@@ -145,7 +146,7 @@ internal fun ProductFormScreen(
         )
         if (categoryInputFocused || categoryName.isNotBlank()) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(
+                AuraRedButton(
                     onClick = {
                         val requestedName = categoryName.trim()
                         categoryIdsBeforeCreate = categories.map { it.id }.toSet()
@@ -153,7 +154,6 @@ internal fun ProductFormScreen(
                         onCreateCategory(requestedName)
                     },
                     enabled = categoryName.isNotBlank(),
-                    colors = ButtonDefaults.buttonColors(containerColor = Red),
                 ) {
                     Text(stringResource(R.string.katalog_create_category))
                 }
@@ -213,7 +213,7 @@ internal fun ProductFormScreen(
             Text(if (uploadingPhoto) stringResource(R.string.katalog_uploading_photo) else stringResource(R.string.katalog_choose_photo))
         }
 
-        Button(
+        AuraRedButton(
             onClick = {
                 val categoriesSelected = selectedCategoryIds.split(',').filter(String::isNotBlank)
                 save(
@@ -235,7 +235,6 @@ internal fun ProductFormScreen(
                 (minimum.toIntOrNull() ?: -1) >= 0 &&
                 (entity != null || (initialStock.toIntOrNull() ?: -1) >= 0) && !saving && !uploadingPhoto,
             modifier = Modifier.fillMaxWidth(),
-            colors = ButtonDefaults.buttonColors(containerColor = Red),
         ) {
             Text(if (saving) stringResource(R.string.katalog_saving) else stringResource(R.string.screen_copy_064))
         }

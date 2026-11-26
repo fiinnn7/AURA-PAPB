@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.sp
 import com.aura.app.R
 import com.aura.app.core.format.RupiahFormatter
 import com.aura.app.ui.barang.BarangTampilan
+import com.aura.app.ui.components.AuraRedButton
 import com.aura.app.ui.components.Page
 import com.aura.app.ui.components.ServerFileImage
 import com.aura.app.ui.theme.Red
@@ -85,7 +86,7 @@ internal fun ProductDetailScreen(
                     Text("${harga.namaSupplier}: ${RupiahFormatter.format(harga.hargaPerItem)} / ${barang.satuan}")
                 }
             }
-            Button(onClick = restock, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Red)) {
+            AuraRedButton(onClick = restock, modifier = Modifier.fillMaxWidth()) {
                 Text(stringResource(R.string.screen_copy_051))
             }
             TextButton(onClick = edit, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.screen_copy_052)) }

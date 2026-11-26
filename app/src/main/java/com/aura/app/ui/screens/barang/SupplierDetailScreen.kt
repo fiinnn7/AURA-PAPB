@@ -18,6 +18,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.aura.app.R
 import com.aura.app.data.remote.dto.SupplierDetailResponseDto
+import com.aura.app.ui.components.AuraRedButton
 import com.aura.app.ui.components.Page
 import com.aura.app.ui.theme.Red
 import com.aura.app.ui.theme.Muted
@@ -38,7 +39,7 @@ internal fun SupplierDetailScreen(
             Text(supplier.nama, style = androidx.compose.material3.MaterialTheme.typography.headlineSmall)
             Text(supplier.catatan ?: stringResource(R.string.katalog_supplier_no_note), color = Muted)
             supplier.link?.let { link ->
-                Button(
+                AuraRedButton(
                     onClick = {
                         val intent = Intent(Intent.ACTION_VIEW, Uri.parse(link))
                         if (intent.resolveActivity(context.packageManager) != null) {
@@ -47,7 +48,6 @@ internal fun SupplierDetailScreen(
                             onMessage(context.getString(R.string.katalog_link_unavailable))
                         }
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = Red),
                 ) {
                     Text(stringResource(R.string.katalog_contact_supplier))
                 }

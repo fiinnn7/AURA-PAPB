@@ -32,6 +32,7 @@ import com.aura.app.data.remote.dto.AnalisisRingkasanResponseDto
 import com.aura.app.ui.analisis.AnalisisDataState
 import com.aura.app.ui.analisis.AnalisisPeriodeUi
 import com.aura.app.ui.analisis.AnalisisUiState
+import com.aura.app.ui.components.AuraRedButton
 import com.aura.app.ui.components.Heading
 import com.aura.app.ui.components.Page
 import com.aura.app.ui.components.Panel
@@ -101,10 +102,7 @@ internal fun AnalysisScreen(
                     Spacer(Modifier.height(4.dp))
                     Text(state.message, fontSize = 12.sp, color = Muted)
                     Spacer(Modifier.height(10.dp))
-                    Button(
-                        onClick = onRefresh,
-                        colors = ButtonDefaults.buttonColors(containerColor = Red),
-                    ) {
+                    AuraRedButton(onClick = onRefresh) {
                         Text("Coba Lagi")
                     }
                 }

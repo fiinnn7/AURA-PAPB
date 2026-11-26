@@ -684,7 +684,7 @@ fun AuraNavHost(
 
                     Routes.DASHBOARD -> DashboardScreen(keuanganState.toko, products, transactions, cashRecords, hideBalance, { hideBalance = !hideBalance }, { go(it) })
                     Routes.MENU_MANAJEMEN -> ManagementScreen(go = {
-                        if (it == Routes.PERGERAKAN_STOK) selectedProductId = ""
+                        if (it == Routes.PERGERAKAN_STOK || it == Routes.CATAT_RESTOCK) selectedProductId = ""
                         go(it)
                     })
                     Routes.ANALISIS -> AnalysisScreen(
@@ -1139,12 +1139,14 @@ fun AuraNavHost(
                         }
                         CashierScreen(
                             items = katalogState.barang.filter { it.barang.status == com.aura.app.core.model.StatusBarang.AKTIF },
+                            cartQuantities = kasirState.keranjang.associate { it.barangId to it.jumlah },
                             search = search,
                             setSearch = { search = it },
                             fileBytes = katalogState.fileBytes,
                             failedFileIds = katalogState.fileIdsGagalDimuat,
                             loadFile = katalogVm::muatFile,
                             add = kasirVm::tambahBarang,
+                            decrement = { kasirVm.ubahJumlah(it.id, -1) },
                             cart = { go(Routes.K2_CATAT_TRANSAKSI) },
                             history = { go(Routes.RIWAYAT_HARI_INI) },
                             avatar = { showAvatar = true },

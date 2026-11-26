@@ -35,6 +35,7 @@ import androidx.compose.ui.unit.sp
 import com.aura.app.R
 import com.aura.app.core.model.StatusAkun
 import com.aura.app.data.local.entity.SupplierEntity
+import com.aura.app.ui.components.AuraRedButton
 import com.aura.app.ui.theme.Bg
 import com.aura.app.ui.theme.Muted
 import com.aura.app.ui.theme.Red
@@ -69,7 +70,7 @@ internal fun SupplierScreen(
                 fontSize = 21.sp,
                 fontWeight = FontWeight.Bold,
             )
-            Button(
+            AuraRedButton(
                 onClick = {
                     editing = null
                     showForm = true
@@ -77,7 +78,6 @@ internal fun SupplierScreen(
                     link = ""
                     note = ""
                 },
-                colors = ButtonDefaults.buttonColors(containerColor = Red),
             ) {
                 Text(stringResource(R.string.katalog_add_supplier))
             }
@@ -109,13 +109,12 @@ internal fun SupplierScreen(
                         label = { Text(stringResource(R.string.screen_copy_041)) },
                     )
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Button(
+                        AuraRedButton(
                             onClick = {
                                 save(editing, name.trim(), link.trim().takeIf(String::isNotEmpty), note.trim().takeIf(String::isNotEmpty))
                                 showForm = false
                             },
                             enabled = name.isNotBlank(),
-                            colors = ButtonDefaults.buttonColors(containerColor = Red),
                         ) {
                             Text(stringResource(R.string.screen_copy_081))
                         }

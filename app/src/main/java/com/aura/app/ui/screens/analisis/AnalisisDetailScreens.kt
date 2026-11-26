@@ -43,6 +43,7 @@ import com.aura.app.data.remote.dto.UmurStokDetailResponseDto
 import com.aura.app.ui.analisis.AnalisisDataState
 import com.aura.app.ui.analisis.AnalisisPeriodeUi
 import com.aura.app.ui.analisis.AnalisisUiState
+import com.aura.app.ui.components.AuraRedButton
 import com.aura.app.ui.components.Heading
 import com.aura.app.ui.components.Page
 import com.aura.app.ui.components.Panel
@@ -456,7 +457,7 @@ private fun <T> DetailStateContainer(
                 Text("Gagal memuat data", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Ink)
                 Text(state.message, fontSize = 12.sp, color = Muted)
                 Spacer(Modifier.height(8.dp))
-                Button(onClick = onRetry, colors = ButtonDefaults.buttonColors(containerColor = Red)) {
+                AuraRedButton(onClick = onRetry) {
                     Text("Coba Lagi")
                 }
             }

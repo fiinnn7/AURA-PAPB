@@ -67,18 +67,19 @@ internal fun CartScreen(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
+                        val canPlus = item.jumlah < item.stokSaatDipilih
                         Text(
                             stringResource(R.string.screen_copy_094),
-                            modifier = Modifier.clickable { change(item.barangId, -1) }.padding(8.dp),
+                            modifier = Modifier.clickable(enabled = item.jumlah > 0) { change(item.barangId, -1) }.padding(8.dp),
                             fontSize = 20.sp,
-                            color = Red,
+                            color = if (item.jumlah > 0) Red else Muted,
                         )
                         Text(item.jumlah.toString(), fontWeight = FontWeight.Bold)
                         Text(
                             stringResource(R.string.screen_copy_095),
-                            modifier = Modifier.clickable { change(item.barangId, 1) }.padding(8.dp),
+                            modifier = Modifier.clickable(enabled = canPlus) { change(item.barangId, 1) }.padding(8.dp),
                             fontSize = 20.sp,
-                            color = Red,
+                            color = if (canPlus) Red else Muted,
                         )
                         Spacer(Modifier.weight(1f))
                         Text(

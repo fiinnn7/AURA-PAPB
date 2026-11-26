@@ -40,6 +40,7 @@ import com.aura.app.R
 import com.aura.app.core.format.RupiahFormatter
 import com.aura.app.core.model.StatusStok
 import com.aura.app.ui.barang.BarangTampilan
+import com.aura.app.ui.components.AuraRedButton
 import com.aura.app.ui.components.ServerFileImage
 import com.aura.app.ui.theme.Red
 import com.aura.app.ui.theme.Soft
@@ -89,7 +90,7 @@ internal fun ProductListScreen(
                     Text(stringResource(R.string.katalog_title), fontSize = 21.sp, fontWeight = FontWeight.Bold)
                     Text(stringResource(R.string.katalog_subtitle), color = Muted, fontSize = 12.sp)
                 }
-                Button(onClick = add, colors = ButtonDefaults.buttonColors(containerColor = Red)) {
+                AuraRedButton(onClick = add) {
                     Text(stringResource(R.string.katalog_add))
                 }
             }

@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aura.app.R
 import com.aura.app.ui.barang.KategoriTampilan
+import com.aura.app.ui.components.AuraRedButton
 import com.aura.app.ui.theme.Bg
 import com.aura.app.ui.theme.Red
 import com.aura.app.ui.theme.Soft
@@ -67,14 +68,13 @@ internal fun CategoryManagementScreen(
                     singleLine = true,
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(
+                    AuraRedButton(
                         onClick = {
                             save(editingId, name.trim())
                             editingId = null
                             name = ""
                         },
                         enabled = name.isNotBlank(),
-                        colors = ButtonDefaults.buttonColors(containerColor = Red),
                     ) {
                         Text(if (editingId == null) stringResource(R.string.katalog_add_category) else stringResource(R.string.screen_copy_083))
                     }
