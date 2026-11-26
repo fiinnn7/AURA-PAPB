@@ -23,6 +23,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -81,6 +82,7 @@ class KatalogViewModel(
 
     private var observedStoreId: String? = null
     private var observeJob: Job? = null
+    private var observePergerakanJob: Job? = null
 
     fun muat(idToko: String) {
         if (observedStoreId != idToko) {
@@ -180,6 +182,17 @@ class KatalogViewModel(
     }
 
     fun muatPergerakan(idToko: String, barangId: String? = null) {
+        // Screen Pergerakan Stok memakai ViewModel tersendiri. Pastikan Flow Room
+        // tetap diamati di sini; sebelumnya Flow hanya mulai diamati oleh muat()
+        // pada screen katalog sehingga daftar pergerakan bisa tetap kosong.
+        observePergerakanJob?.cancel()
+        observePergerakanJob = viewModelScope.launch {
+            repository.observePergerakan(idToko).collect { movements ->
+                _uiState.update { state ->
+                    state.copy(pergerakan = movements, idToko = idToko)
+                }
+            }
+        }
         _uiState.update {
             it.copy(
                 idToko = idToko,

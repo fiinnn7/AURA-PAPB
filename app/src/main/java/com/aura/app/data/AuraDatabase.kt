@@ -234,6 +234,22 @@ interface AuraDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun putNotification(value: NotificationEntity)
     @Query("UPDATE notifications SET isRead = 1") suspend fun readAllNotifications()
     @Query("UPDATE notifications SET isRead = 1 WHERE id = :id") suspend fun readNotification(id: String)
+
+    // This database belongs to the retired demo/local-only implementation. The
+    // server-backed repositories in AppDatabase are now the source of truth.
+    @Query("DELETE FROM accounts") suspend fun clearLegacyAccounts()
+    @Query("DELETE FROM stores") suspend fun clearLegacyStores()
+    @Query("DELETE FROM sessions") suspend fun clearLegacySessions()
+    @Query("DELETE FROM products") suspend fun clearLegacyProducts()
+    @Query("DELETE FROM suppliers") suspend fun clearLegacySuppliers()
+    @Query("DELETE FROM transactions") suspend fun clearLegacyTransactions()
+    @Query("DELETE FROM transaction_items") suspend fun clearLegacyTransactionItems()
+    @Query("DELETE FROM cash_records") suspend fun clearLegacyCashRecords()
+    @Query("DELETE FROM restocks") suspend fun clearLegacyRestocks()
+    @Query("DELETE FROM stock_adjustments") suspend fun clearLegacyAdjustments()
+    @Query("DELETE FROM stock_movements") suspend fun clearLegacyMovements()
+    @Query("DELETE FROM activity_logs") suspend fun clearLegacyActivities()
+    @Query("DELETE FROM notifications") suspend fun clearLegacyNotifications()
 }
 
 @Database(

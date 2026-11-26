@@ -36,7 +36,7 @@ class AuraViewModel(application: Application) : AndroidViewModel(application) {
     private val _ready = MutableStateFlow(false)
     val ready = _ready.asStateFlow()
 
-    init { viewModelScope.launch { repository.seed(); _ready.value = true } }
+    init { viewModelScope.launch { runCatching { repository.clearLegacyDemoData() }; _ready.value = true } }
 
     private fun action(block: suspend () -> Unit) {
         viewModelScope.launch {

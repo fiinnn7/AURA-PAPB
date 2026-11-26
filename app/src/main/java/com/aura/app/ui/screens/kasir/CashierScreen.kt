@@ -1,6 +1,7 @@
 package com.aura.app.ui.screens.kasir
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -123,6 +124,7 @@ internal fun CashierScreen(
                 Column(
                     Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp))
                         .background(if (habis) Soft else androidx.compose.ui.graphics.Color.White)
+                        .border(1.dp, androidx.compose.ui.graphics.Color(0xFFE5E7EB), RoundedCornerShape(16.dp))
                         .clickable(enabled = !habis) { add(barang) }.padding(10.dp),
                     verticalArrangement = Arrangement.spacedBy(5.dp),
                 ) {

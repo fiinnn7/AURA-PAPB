@@ -21,6 +21,9 @@ interface TransaksiDao {
     @Query("SELECT * FROM item_transaksi WHERE transaksiId = :transaksiId")
     fun observeItems(transaksiId: String): Flow<List<ItemTransaksiEntity>>
 
+    @Query("SELECT item_transaksi.* FROM item_transaksi INNER JOIN transaksi_penjualan ON item_transaksi.transaksiId = transaksi_penjualan.id WHERE transaksi_penjualan.idToko = :idToko")
+    fun observeItemsByStore(idToko: String): Flow<List<ItemTransaksiEntity>>
+
     @Upsert
     suspend fun upsertTransaksi(daftar: List<TransaksiPenjualanEntity>)
 

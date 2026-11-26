@@ -3,8 +3,10 @@ package com.aura.app.ui.screens.profile
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
@@ -51,6 +53,9 @@ internal fun ProfileScreen(
     )
 
     Page(modifier = modifier) {
+        Text("AURA  •  Profil", color = Red, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold)
+        Text("Informasi akun dan pengaturan toko", color = Muted, fontSize = 12.sp)
+        Spacer(Modifier.height(12.dp))
         Panel {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(
@@ -67,7 +72,8 @@ internal fun ProfileScreen(
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
                     Text(name, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                    Text(peranLabel, fontSize = 12.sp, color = Purple, fontWeight = FontWeight.Medium)
+                    Text(peranLabel, fontSize = 10.sp, color = Purple, fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(top = 2.dp))
                     Text(stringResource(R.string.profil_id_toko_format, storeId), fontSize = 11.sp, color = Muted)
                     if (!sesi?.email.isNullOrBlank()) {
                         Text(sesi!!.email!!, fontSize = 11.sp, color = Muted)
@@ -87,6 +93,8 @@ internal fun ProfileScreen(
             }
         }
 
+        Text("Pengaturan & Usaha", color = Muted, fontSize = 11.sp, fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(start = 3.dp, top = 8.dp, bottom = 5.dp))
         ActionRow(
             title = stringResource(R.string.profil_edit_title),
             detail = stringResource(R.string.sheet_avatar_edit_profil_detail),

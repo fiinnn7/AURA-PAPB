@@ -1,9 +1,11 @@
 package com.aura.app.ui.screens.barang
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -66,13 +68,14 @@ internal fun ProductListScreen(
     add: () -> Unit,
 ) {
     var filter by rememberSaveable { mutableStateOf("Semua") }
+    val categories = items.flatMap { it.kategori }.distinct().sorted()
     var deleteId by rememberSaveable { mutableStateOf<String?>(null) }
     val visible = items.filter { item ->
         val barang = item.barang
         val matchesQuery = barang.nama.contains(search, ignoreCase = true) ||
             barang.sku.orEmpty().contains(search, ignoreCase = true)
-        val matchesStatus = filter == "Semua" || item.statusStok.name == filter
-        matchesQuery && matchesStatus
+        val matchesCategory = filter == "Semua" || filter in item.kategori
+        matchesQuery && matchesCategory
     }
 
     LazyColumn(
@@ -86,12 +89,23 @@ internal fun ProductListScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
                 Column(Modifier.weight(1f)) {
-                    Text(stringResource(R.string.katalog_title), fontSize = 21.sp, fontWeight = FontWeight.Bold)
-                    Text(stringResource(R.string.katalog_subtitle), color = Muted, fontSize = 12.sp)
+                    Text("Manajemen Barang", fontSize = 21.sp, fontWeight = FontWeight.Bold)
+                    Text("Kelola katalog dan pantau ketersediaan stok", color = Muted, fontSize = 12.sp)
                 }
                 Button(onClick = add, colors = ButtonDefaults.buttonColors(containerColor = Red)) {
                     Text(stringResource(R.string.katalog_add))
                 }
+            }
+        }
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                val active = items.count { it.statusStok == StatusStok.AMAN }
+                val low = items.count { it.statusStok == StatusStok.MENIPIS }
+                val empty = items.count { it.statusStok == StatusStok.HABIS }
+                Box(Modifier.weight(1f)) { MiniStockMetric("Semua", items.size.toString(), Red) }
+                Box(Modifier.weight(1f)) { MiniStockMetric("Aman", active.toString(), androidx.compose.ui.graphics.Color(0xFF16834A)) }
+                Box(Modifier.weight(1f)) { MiniStockMetric("Menipis", low.toString(), androidx.compose.ui.graphics.Color(0xFFF59E0B)) }
+                Box(Modifier.weight(1f)) { MiniStockMetric("Habis", empty.toString(), Red) }
             }
         }
         item {
@@ -109,14 +123,8 @@ internal fun ProductListScreen(
                 modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                listOf("Semua", "AMAN", "MENIPIS", "HABIS", "DIARSIPKAN").forEach { status ->
-                    val label = when (status) {
-                        "AMAN" -> stringResource(R.string.katalog_status_safe)
-                        "MENIPIS" -> stringResource(R.string.katalog_status_low)
-                        "HABIS" -> stringResource(R.string.katalog_status_empty)
-                        "DIARSIPKAN" -> stringResource(R.string.katalog_status_archived)
-                        else -> stringResource(R.string.katalog_status_all)
-                    }
+                (listOf("Semua") + categories).forEach { status ->
+                    val label = status
                     FilterChip(
                         selected = filter == status,
                         onClick = { filter = status },
@@ -156,9 +164,10 @@ internal fun ProductListScreen(
             items(visible, key = { it.barang.id }) { item ->
                 val barang = item.barang
                 Row(
-                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp))
-                        .background(androidx.compose.ui.graphics.Color.White).clickable { detail(barang.id) }
-                        .padding(12.dp),
+                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(17.dp))
+                        .background(androidx.compose.ui.graphics.Color.White)
+                        .border(1.dp, androidx.compose.ui.graphics.Color(0xFFE5E7EB), RoundedCornerShape(17.dp))
+                        .clickable { detail(barang.id) }.padding(12.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
@@ -167,7 +176,7 @@ internal fun ProductListScreen(
                         bytes = barang.fotoFileId?.let(fileBytes::get),
                         gagalDimuat = barang.fotoFileId in failedFileIds,
                         onLoad = loadFile,
-                        modifier = Modifier.size(56.dp).clip(RoundedCornerShape(12.dp)),
+                        modifier = Modifier.size(64.dp).clip(RoundedCornerShape(12.dp)),
                         contentDescription = barang.nama,
                     )
                     Column(Modifier.weight(1f)) {
@@ -190,8 +199,13 @@ internal fun ProductListScreen(
                                 StatusStok.HABIS -> stringResource(R.string.katalog_status_empty)
                                 StatusStok.DIARSIPKAN -> stringResource(R.string.katalog_status_archived)
                             },
-                            color = Muted,
-                            fontSize = 11.sp,
+                            color = when (item.statusStok) {
+                                StatusStok.AMAN -> androidx.compose.ui.graphics.Color(0xFF16834A)
+                                StatusStok.MENIPIS -> androidx.compose.ui.graphics.Color(0xFFB7791F)
+                                else -> Red
+                            },
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.SemiBold,
                         )
                     }
                     Column(horizontalAlignment = Alignment.End) {
@@ -225,5 +239,18 @@ internal fun ProductListScreen(
                 TextButton(onClick = { deleteId = null }) { Text(stringResource(R.string.screen_copy_043)) }
             },
         )
+    }
+}
+
+
+@Composable
+private fun MiniStockMetric(label: String, value: String, accent: androidx.compose.ui.graphics.Color) {
+    Column(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(13.dp))
+            .background(androidx.compose.ui.graphics.Color.White).padding(vertical = 10.dp, horizontal = 7.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(value, color = accent, fontWeight = FontWeight.ExtraBold, fontSize = 17.sp)
+        Text(label, color = Muted, fontSize = 9.sp)
     }
 }

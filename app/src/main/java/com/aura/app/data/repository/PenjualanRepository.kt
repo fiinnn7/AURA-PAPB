@@ -4,6 +4,7 @@ import androidx.room.withTransaction
 import com.aura.app.core.model.Peran
 import com.aura.app.data.local.AppDatabase
 import com.aura.app.data.local.entity.TransaksiPenjualanEntity
+import com.aura.app.data.local.entity.ItemTransaksiEntity
 import com.aura.app.data.network.KoneksiChecker
 import com.aura.app.data.preferences.SesiAktif
 import com.aura.app.data.preferences.SesiRepository
@@ -20,6 +21,7 @@ import kotlinx.coroutines.flow.first
 
 interface PenjualanRepository {
     fun observeTransaksiHariIni(idToko: String): Flow<List<TransaksiPenjualanEntity>>
+    fun observeItemTransaksi(idToko: String): Flow<List<ItemTransaksiEntity>>
     suspend fun refreshRiwayatHariIni(idToko: String)
     suspend fun ambilMetodePembayaran(idToko: String): MetodePembayaranTokoDto
     suspend fun detailTransaksi(idToko: String, transaksiId: String): TransaksiDetailResponseDto
@@ -42,6 +44,9 @@ class DefaultPenjualanRepository(
     override fun observeTransaksiHariIni(idToko: String): Flow<List<TransaksiPenjualanEntity>> =
         db.transaksiDao().observeTransaksi(idToko)
 
+    override fun observeItemTransaksi(idToko: String): Flow<List<ItemTransaksiEntity>> =
+        db.transaksiDao().observeItemsByStore(idToko)
+
     override suspend fun refreshRiwayatHariIni(idToko: String) {
         requireSession(idToko)
         koneksi.pastikanOnline()
@@ -59,10 +64,16 @@ class DefaultPenjualanRepository(
         } while (cursor != null)
 
         val transaksi = data.map { it.toEntity(idToko) }
+        // The list endpoint intentionally returns compact transaction rows. Fetch each
+        // transaction detail so analytics can use the server's HPP and item snapshots.
+        val itemSnapshots = data.flatMap { row ->
+            remote.detailTransaksi(row.id).rincianBarang.map { it.toEntity(row.id) }
+        }
         db.withTransaction {
             db.transaksiDao().clearItemsByToko(idToko)
             db.transaksiDao().clearByToko(idToko)
             if (transaksi.isNotEmpty()) db.transaksiDao().upsertTransaksi(transaksi)
+            if (itemSnapshots.isNotEmpty()) db.transaksiDao().upsertItems(itemSnapshots)
         }
     }
 

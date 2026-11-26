@@ -1,6 +1,7 @@
 package com.aura.app.ui.screens.kasir
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -106,13 +107,18 @@ internal fun PaymentScreen(
             ).forEach { (value, label) ->
                 Row(
                     Modifier.fillMaxWidth()
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(Color.White)
+                        .clip(RoundedCornerShape(15.dp))
+                        .background(if (method == value) Color(0xFFFFF5F5) else Color.White)
+                        .border(
+                            1.dp,
+                            if (method == value) Red else Color(0xFFE5E7EB),
+                            RoundedCornerShape(15.dp),
+                        )
                         .clickable(enabled = requestTertunda == null && !isSaving) {
                             methodName = value.name
                             paymentConfirmed = false
                         }
-                        .padding(10.dp),
+                        .padding(horizontal = 10.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     RadioButton(

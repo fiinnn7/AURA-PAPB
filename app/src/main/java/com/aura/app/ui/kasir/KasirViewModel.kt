@@ -10,6 +10,7 @@ import com.aura.app.core.model.Peran
 import com.aura.app.core.model.StatusBarang
 import com.aura.app.data.local.entity.BarangEntity
 import com.aura.app.data.local.entity.TransaksiPenjualanEntity
+import com.aura.app.data.local.entity.ItemTransaksiEntity
 import com.aura.app.data.preferences.SesiAktif
 import com.aura.app.data.remote.dto.BarangDibeliRequestDto
 import com.aura.app.data.remote.dto.MetodePembayaranTokoDto
@@ -52,6 +53,7 @@ data class PengajuanPembatalanTertunda(
 data class KasirUiState(
     val keranjang: List<BarisKeranjang> = emptyList(),
     val transaksiHariIni: List<TransaksiPenjualanEntity> = emptyList(),
+    val itemTransaksi: List<ItemTransaksiEntity> = emptyList(),
     val isLoadingRiwayat: Boolean = false,
     val riwayatError: PesanKasir? = null,
     val metodePembayaran: MetodePembayaranTokoDto? = null,
@@ -101,6 +103,9 @@ class KasirViewModel(
         _uiState.value = KasirUiState()
         if (sesi != null) {
             observeRiwayatJob = viewModelScope.launch {
+                launch { penjualanRepository.observeItemTransaksi(sesi.idToko).collect { items ->
+                    _uiState.update { it.copy(itemTransaksi = items) }
+                } }
                 penjualanRepository.observeTransaksiHariIni(sesi.idToko).collect { transaksi ->
                     val terlihat = if (sesi.peran == Peran.KASIR) {
                         transaksi.filter { it.akunId == sesi.akunId }

@@ -11,49 +11,20 @@ class AuraRepository(private val db: AuraDatabase) {
     private fun id() = UUID.randomUUID().toString()
     private fun todayCode(): String = SimpleDateFormat("yyMMdd", Locale.US).format(Date())
 
-    suspend fun seed() = db.withTransaction {
-        if (dao.anyStore() != null) return@withTransaction
-        val storeId = "AB12CD34"
-        dao.putStore(StoreEntity(storeId, "Toko Berkah Jaya", "Retail / Sembako", 4_850_000L,
-            "BCA 1234567890 a.n. Budi Santoso\nMandiri 0987654321 a.n. Budi Santoso"))
-        listOf(
-            ProductEntity("BRG-001","IDM-ST-001","Indomie Soto Kuah","Makanan,Instan","pcs",3500,2800,50,10,142),
-            ProductEntity("BRG-002","NBT-KJ-002","Nabati Keju 100g","Makanan","pcs",2000,1500,15,20,88),
-            ProductEntity("BRG-003","MNY-BM-003","Minyak Goreng Bimoli 1L","Sembako,Dapur","pouch",18500,15500,0,5,64),
-            ProductEntity("BRG-004","TLR-AY-004","Telur Ayam Ras 1kg","Sembako","kg",28000,24500,4,10,55),
-            ProductEntity("BRG-005","GLP-KR-005","Gula Pasir Kristal 1kg","Sembako,Dapur","kg",16000,14000,3,8,47),
-            ProductEntity("BRG-006","KPK-SP-006","Kopi Kapal Api Spesial","Minuman","pcs",1500,1100,42,10,110)
-        ).forEach { dao.putProduct(it) }
-        listOf(
-            SupplierEntity("SUP-001","Toko Grosir Maju","0812-3456-7890","Pasar Induk Blok B"),
-            SupplierEntity("SUP-002","Agen Sembako Jaya","0857-9988-1122","Sembako & Minyak"),
-            SupplierEntity("SUP-003","CV Sumber Pangan","0819-0011-2233","Malang")
-        ).forEach { dao.putSupplier(it) }
-        val now = System.currentTimeMillis()
-        val initial = listOf(
-            TransactionEntity("INV-261117-0003",now-86_400_000,"Siti Aminah","Tunai",17_500,"Selesai"),
-            TransactionEntity("INV-261117-0002",now-90_000_000,"Andi Pratama","QRIS",52_500,"Perlu Ditinjau","Konflik stok offline",balancePosted=false),
-            TransactionEntity("INV-261117-0001",now-100_000_000,"Siti Aminah","Tunai",35_000,"Dibatalkan","Salah input jumlah barang",balancePosted=false)
-        )
-        initial.forEach { dao.putTransaction(it) }
-        dao.putTransactionItems(listOf(
-            TransactionItemEntity(invoiceNo="INV-261117-0003",productId="BRG-001",productName="Indomie Soto Kuah",quantity=3,unitPrice=3500,unitCost=2800),
-            TransactionItemEntity(invoiceNo="INV-261117-0003",productId="BRG-002",productName="Nabati Keju 100g",quantity=2,unitPrice=2000,unitCost=1500),
-            TransactionItemEntity(invoiceNo="INV-261117-0003",productId="BRG-006",productName="Kopi Kapal Api Spesial",quantity=2,unitPrice=1500,unitCost=1100)
-        ))
-        // Riwayat contoh dari prototype HTML agar layar audit tidak kosong pada first launch.
-        dao.putRestock(RestockEntity("RST-261117-0001","BRG-001","SUP-001",40,2750,110000,now-7*86_400_000L,"Restock awal demo"))
-        dao.putAdjustment(StockAdjustmentEntity("ADJ-261116-0001","BRG-002",18,15,-3,"Rusak","Kemasan rusak",4500,now-8*86_400_000L))
-        dao.putMovement(StockMovementEntity("MOV-001","BRG-001","Indomie Soto Kuah","Masuk - Restock",40,5,45,"RST-261117-0001",now-7*86_400_000L))
-        dao.putMovement(StockMovementEntity("MOV-002","BRG-001","Indomie Soto Kuah","Keluar - Penjualan",-2,45,43,"INV-261117-0003",now-7*86_400_000L+4*60*60*1000))
-        dao.putMovement(StockMovementEntity("MOV-003","BRG-002","Nabati Keju 100g","Penyesuaian - Rusak",-3,18,15,"ADJ-261116-0001",now-8*86_400_000L))
-        dao.putMovement(StockMovementEntity("MOV-004","BRG-002","Nabati Keju 100g","Masuk - Pembatalan",3,12,15,"INV-261116-0045",now-9*86_400_000L))
-        dao.putCashRecord(CashRecordEntity("EXP-002","expense","Kustom",350000,"Tagihan Listrik Bulan November",now-8*86_400_000L))
-        dao.putCashRecord(CashRecordEntity("EXP-003","expense","Kustom",65000,"Perlengkapan Kebersihan & Kresek",now-8*86_400_000L+3600000))
-        dao.putCashRecord(CashRecordEntity("INC-001","income","Modal",500000,"Tambahan Modal Kasir",now-9*86_400_000L,isCapital=true))
-        dao.putNotification(NotificationEntity(id(), "Stok Nabati Keju menipis", "Sisa stok berada di bawah batas minimum.", "stock", now))
-        dao.putNotification(NotificationEntity(id(), "Pengajuan pembatalan transaksi", "INV-261117-0002 menunggu persetujuan Owner.", "transaction", now-1000))
-        log("system", "Inisialisasi data", "Data demo AURA berhasil disiapkan")
+    suspend fun clearLegacyDemoData() = db.withTransaction {
+        dao.clearLegacyTransactionItems()
+        dao.clearLegacyTransactions()
+        dao.clearLegacyProducts()
+        dao.clearLegacySuppliers()
+        dao.clearLegacyCashRecords()
+        dao.clearLegacyRestocks()
+        dao.clearLegacyAdjustments()
+        dao.clearLegacyMovements()
+        dao.clearLegacyActivities()
+        dao.clearLegacyNotifications()
+        dao.clearLegacyAccounts()
+        dao.clearLegacySessions()
+        dao.clearLegacyStores()
     }
 
     private suspend fun log(actor: String, action: String, detail: String) {

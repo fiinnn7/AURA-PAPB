@@ -12,9 +12,18 @@ fun AuraTheme(content: @Composable () -> Unit) {
         colorScheme = lightColorScheme(
             primary = Red,
             onPrimary = Color.White,
+            secondary = DarkRed,
+            onSecondary = Color.White,
+            tertiary = Green,
             background = Bg,
+            onBackground = Ink,
             surface = Color.White,
             onSurface = Ink,
+            surfaceVariant = Soft,
+            onSurfaceVariant = Muted,
+            outline = Border,
+            error = Red,
+            onError = Color.White,
         ),
         content = content,
     )

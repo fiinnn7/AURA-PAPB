@@ -25,6 +25,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
@@ -43,7 +44,12 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -255,7 +261,7 @@ fun AuraNavHost(
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
 
-    var selectedProductId by rememberSaveable { mutableStateOf("BRG-001") }
+    var selectedProductId by rememberSaveable { mutableStateOf("") }
     var editProductId by rememberSaveable { mutableStateOf<String?>(null) }
     var selectedSupplierId by rememberSaveable { mutableStateOf("") }
     var showAvatar by remember { mutableStateOf(false) }
@@ -330,7 +336,8 @@ fun AuraNavHost(
     LaunchedEffect(route, sesiAktif?.idToko) {
         when (route) {
             Routes.K3_PEMBAYARAN -> kasirVm.muatMetodePembayaran()
-            Routes.RIWAYAT_HARI_INI, Routes.RIWAYAT_HARI_INI_OWNER -> kasirVm.muatRiwayatHariIni()
+            Routes.RIWAYAT_HARI_INI, Routes.RIWAYAT_HARI_INI_OWNER,
+            Routes.DASHBOARD, Routes.ANALISIS -> kasirVm.muatRiwayatHariIni()
         }
     }
 
@@ -380,6 +387,8 @@ fun AuraNavHost(
                 Routes.PEMASUKAN,
                 Routes.METODE_PEMBAYARAN,
                 Routes.PENGATURAN_TOKO,
+                Routes.DASHBOARD,
+                Routes.ANALISIS,
             )
         ) {
             keuanganVm.refresh()
@@ -481,7 +490,20 @@ fun AuraNavHost(
         Box(Modifier.fillMaxSize().padding(padding)) {
             RouteNavHost(navController) { activeRoute, backStackEntry ->
                 if (!ready || !startupChecked) {
-                    CircularProgressIndicator(Modifier.align(Alignment.Center), color = Red)
+                    // Dialog menggunakan koordinat seluruh window, bukan area konten
+                    // Scaffold yang sudah terpotong TopAppBar/BottomBar.
+                    Dialog(
+                        onDismissRequest = {},
+                        properties = DialogProperties(
+                            dismissOnBackPress = false,
+                            dismissOnClickOutside = false,
+                            usePlatformDefaultWidth = false,
+                        ),
+                    ) {
+                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            CircularProgressIndicator(color = Red)
+                        }
+                    }
                 } else when (activeRoute) {
                     Routes.WELCOME -> WelcomeScreen({ go(Routes.LOGIN) }, { go(Routes.REGISTER_STEP1) })
 
@@ -659,9 +681,55 @@ fun AuraNavHost(
                         )
                     }
 
-                    Routes.DASHBOARD -> DashboardScreen(keuanganState.toko, products, transactions, cashRecords, hideBalance, { hideBalance = !hideBalance }, { go(it) })
+                    Routes.DASHBOARD -> {
+                        val dashboardCatalogVm: KatalogViewModel = viewModel(
+                            backStackEntry,
+                            factory = KatalogViewModel.factory(barangRepository),
+                        )
+                        val dashboardCatalog by dashboardCatalogVm.uiState.collectAsStateWithLifecycle()
+                        LaunchedEffect(sesiAktif?.idToko) {
+                            sesiAktif?.idToko?.let(dashboardCatalogVm::muat)
+                        }
+                        DashboardScreen(
+                            store = keuanganState.toko,
+                            products = dashboardCatalog.barang.map { it.barang },
+                            tx = kasirState.transaksiHariIni,
+                            expenses = keuanganState.pengeluaran,
+                            hide = hideBalance,
+                            toggle = { hideBalance = !hideBalance },
+                            go = { go(it) },
+                            loading = dashboardCatalog.isLoading || kasirState.isLoadingRiwayat || keuanganState.isLoading,
+                            error = dashboardCatalog.errorMessage ?: kasirState.riwayatError?.detail ?: keuanganState.errorMessage,
+                            retry = { dashboardCatalogVm.refresh(); kasirVm.muatRiwayatHariIni(); keuanganVm.refresh() },
+                        )
+                    }
                     Routes.MENU_MANAJEMEN -> ManagementScreen(go = { go(it) })
-                    Routes.ANALISIS -> AnalysisScreen(analysisTab, { analysisTab = it }, products, transactions, transactionItems, cashRecords, adjustments, restocks, movements)
+                    Routes.ANALISIS -> {
+                        val analysisCatalogVm: KatalogViewModel = viewModel(
+                            backStackEntry,
+                            factory = KatalogViewModel.factory(barangRepository),
+                        )
+                        val analysisCatalog by analysisCatalogVm.uiState.collectAsStateWithLifecycle()
+                        LaunchedEffect(sesiAktif?.idToko) {
+                            sesiAktif?.idToko?.let { idToko ->
+                                analysisCatalogVm.muat(idToko)
+                                analysisCatalogVm.muatPergerakan(idToko)
+                            }
+                        }
+                        AnalysisScreen(
+                            tab = analysisTab,
+                            setTab = { analysisTab = it },
+                            products = analysisCatalog.barang.map { it.barang },
+                            tx = kasirState.transaksiHariIni,
+                            items = kasirState.itemTransaksi,
+                            expenses = keuanganState.pengeluaran,
+                            incomes = keuanganState.pemasukan,
+                            movements = analysisCatalog.pergerakan,
+                            loading = analysisCatalog.isLoading || kasirState.isLoadingRiwayat || keuanganState.isLoading,
+                            error = analysisCatalog.errorMessage ?: kasirState.riwayatError?.detail ?: keuanganState.errorMessage,
+                            retry = { analysisCatalogVm.refresh(); sesiAktif?.idToko?.let(analysisCatalogVm::muatPergerakan); kasirVm.muatRiwayatHariIni(); keuanganVm.refresh() },
+                        )
+                    }
                     Routes.NOTIFIKASI -> NotificationScreen(notifications, { vm.readNotification(it) }, { vm.readAllNotifications() }, { go(it) })
                     Routes.PENGELUARAN -> ExpenseListScreen(
                         uiState = keuanganState,
@@ -927,28 +995,33 @@ fun AuraNavHost(
                             factory = KatalogViewModel.factory(barangRepository),
                         )
                         val katalogState by katalogVm.uiState.collectAsStateWithLifecycle()
-                        LaunchedEffect(sesiAktif?.idToko, selectedProductId) {
-                            sesiAktif?.idToko?.let {
-                                katalogVm.muatPergerakan(it, selectedProductId.takeIf(String::isNotBlank))
+                        // Halaman Pergerakan Stok dari menu Manajemen menampilkan seluruh
+                        // riwayat toko. Jangan kirim selectedProductId: nilai awalnya adalah
+                        // Refresh setiap halaman kembali aktif agar transaksi/restock terbaru
+                        // langsung ikut terbaca meskipun destination masih tersimpan di back stack.
+                        val lifecycleOwner = LocalLifecycleOwner.current
+                        DisposableEffect(lifecycleOwner, sesiAktif?.idToko, katalogVm) {
+                            val observer = LifecycleEventObserver { _, event ->
+                                if (event == Lifecycle.Event.ON_RESUME) {
+                                    sesiAktif?.idToko?.let { katalogVm.muatPergerakan(it) }
+                                }
                             }
+                            lifecycleOwner.lifecycle.addObserver(observer)
+                            if (lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) {
+                                sesiAktif?.idToko?.let { katalogVm.muatPergerakan(it) }
+                            }
+                            onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
                         }
                         MovementScreen(
-                            items = katalogState.pergerakan.filter {
-                                selectedProductId.isBlank() || it.barangId == selectedProductId
-                            },
+                            items = katalogState.pergerakan,
                             nextCursor = katalogState.pergerakanNextCursor,
                             loading = katalogState.isLoadingPergerakan,
                             loadingMore = katalogState.isLoadingMorePergerakan,
                             error = katalogState.errorMessage,
                             retry = {
-                                sesiAktif?.idToko?.let {
-                                    katalogVm.muatPergerakan(
-                                        it,
-                                        selectedProductId.takeIf(String::isNotBlank),
-                                    )
-                                }
+                                sesiAktif?.idToko?.let { katalogVm.muatPergerakan(it) }
                             },
-                            loadMore = { katalogVm.muatPergerakanBerikutnya(selectedProductId) },
+                            loadMore = { katalogVm.muatPergerakanBerikutnya() },
                         )
                     }
                     Routes.SUPPLIER -> {
